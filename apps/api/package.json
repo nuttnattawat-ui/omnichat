@@ -37,15 +37,16 @@
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "@nestjs/cli": "^11.0.0",
+    "prisma": "~6.19.0",
+    "typescript": "^5.7.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^11.0.0",
     "@types/bcryptjs": "^2.4.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
-    "@types/passport-jwt": "^4.0.0",
-    "prisma": "~6.19.0",
-    "typescript": "^5.7.0"
-  }
+    "@types/passport-jwt": "^4.0.0"
+  },
+  "_dependencies_note": "prisma, @nestjs/cli, typescript are in dependencies (not dev) because Render skips devDependencies"
 }
