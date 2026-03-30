@@ -27,10 +27,7 @@ services:
           name: omnichat-db
           property: connectionString
       - key: REDIS_URL
-        fromService:
-          name: omnichat-redis
-          type: redis
-          property: connectionString
+        sync: false  # Set manually — use Upstash free: https://upstash.com
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -57,8 +54,3 @@ databases:
     region: singapore
     databaseName: omnichat
     user: omnichat
-
-# --- Redis ---
-  # Note: Render free tier doesn't include Redis
-  # Use Upstash (free) instead: https://upstash.com
-  # Set REDIS_URL manually in Render dashboard
