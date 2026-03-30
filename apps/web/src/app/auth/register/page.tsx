@@ -64,21 +64,6 @@ export default function RegisterPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Team / Company Name
-            </label>
-            <input
-              type="text"
-              value={form.accountName}
-              onChange={(e) =>
-                setForm({ ...form, accountName: e.target.value })
-              }
-              className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              placeholder="Optional"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
               Email
             </label>
             <input
