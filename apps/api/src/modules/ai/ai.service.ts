@@ -4,19 +4,85 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { ChatGateway } from '../../gateway/chat.gateway';
 import { NormalizedMessage } from '../../common/interfaces/normalized-message.interface';
 
+type AiProvider = 'anthropic' | 'openrouter';
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private client: Anthropic | null = null;
+  private provider: AiProvider = 'anthropic';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatGateway: ChatGateway,
   ) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      this.client = new Anthropic({ apiKey });
+    this.initClient();
+  }
+
+  private initClient() {
+    // Priority: OPENROUTER_API_KEY > ANTHROPIC_API_KEY
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+
+    if (openrouterKey) {
+      this.provider = 'openrouter';
+      this.client = new Anthropic({
+        apiKey: openrouterKey,
+        baseURL: 'https://openrouter.ai/api/v1',
+      });
+      this.logger.log('AI provider: OpenRouter');
+    } else if (anthropicKey) {
+      this.provider = 'anthropic';
+      this.client = new Anthropic({ apiKey: anthropicKey });
+      this.logger.log('AI provider: Anthropic');
     }
+  }
+
+  private getModel(): string {
+    // Custom model override via env
+    if (process.env.AI_MODEL) return process.env.AI_MODEL;
+
+    // Defaults per provider
+    return this.provider === 'openrouter'
+      ? 'anthropic/claude-sonnet-4-20250514'
+      : 'claude-sonnet-4-20250514';
+  }
+
+  /** Call AI and get text response */
+  private async chat(
+    systemPrompt: string,
+    messages: { role: 'user' | 'assistant'; content: string }[],
+  ): Promise<string> {
+    if (!this.client) {
+      throw new Error('No AI provider configured. Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY');
+    }
+
+    const response = await this.client.messages.create({
+      model: this.getModel(),
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages,
+    });
+
+    return response.content[0].type === 'text'
+      ? response.content[0].text
+      : '';
+  }
+
+  /** Build message history from conversation */
+  private async getHistory(conversationId: number) {
+    const recentMessages = await this.prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    return recentMessages.reverse().map((m) => ({
+      role: (m.messageType === 'incoming' ? 'user' : 'assistant') as
+        | 'user'
+        | 'assistant',
+      content: m.content || '',
+    }));
   }
 
   /** Handle AI auto-reply for incoming messages */
@@ -26,40 +92,18 @@ export class AiService {
     incomingMsg: NormalizedMessage,
   ) {
     if (!this.client) {
-      this.logger.warn('Anthropic API key not configured');
+      this.logger.warn('No AI provider configured');
       return;
     }
 
     try {
-      // Get recent conversation history for context
-      const recentMessages = await this.prisma.message.findMany({
-        where: { conversationId },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-      });
-
-      const history = recentMessages.reverse().map((m) => ({
-        role: m.messageType === 'incoming' ? 'user' : 'assistant',
-        content: m.content || '',
-      }));
+      const history = await this.getHistory(conversationId);
 
       const systemPrompt =
         inbox.aiPrompt ||
         'You are a helpful customer support assistant. Be friendly, concise, and helpful. Respond in the same language as the customer.';
 
-      const response = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: history.map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        })),
-      });
-
-      const aiReply =
-        response.content[0].type === 'text' ? response.content[0].text : '';
-
+      const aiReply = await this.chat(systemPrompt, history);
       if (!aiReply) return;
 
       // Save AI reply as outgoing message
@@ -92,9 +136,10 @@ export class AiService {
         channel: incomingMsg.channel,
       });
 
-      this.logger.log(`AI reply sent for conversation ${conversationId}`);
+      this.logger.log(
+        `AI reply sent (${this.provider}) for conversation ${conversationId}`,
+      );
 
-      // Return the reply so the webhook can send it back to the platform
       return aiReply;
     } catch (error) {
       this.logger.error('AI auto-reply failed:', error);
@@ -106,35 +151,12 @@ export class AiService {
     conversationId: number,
     customPrompt?: string,
   ): Promise<string> {
-    if (!this.client) {
-      throw new Error('Anthropic API key not configured');
-    }
+    const history = await this.getHistory(conversationId);
 
-    const messages = await this.prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-
-    const history = messages.reverse().map((m) => ({
-      role:
-        m.messageType === 'incoming'
-          ? ('user' as const)
-          : ('assistant' as const),
-      content: m.content || '',
-    }));
-
-    const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system:
-        customPrompt ||
+    return this.chat(
+      customPrompt ||
         'You are a helpful customer support assistant. Suggest a reply for the agent. Be concise.',
-      messages: history,
-    });
-
-    return response.content[0].type === 'text'
-      ? response.content[0].text
-      : '';
+      history,
+    );
   }
 }
