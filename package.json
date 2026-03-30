@@ -5,7 +5,8 @@
   "description": "Omnichannel Chat Platform - LINE, Facebook, Instagram unified inbox",
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo build",
+    "build": "turbo build --filter=@omnichat/web",
+    "build:all": "turbo build",
     "lint": "turbo lint",
     "dev:api": "pnpm --filter @omnichat/api dev",
     "dev:web": "pnpm --filter @omnichat/web dev",
