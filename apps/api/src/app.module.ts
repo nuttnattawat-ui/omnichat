@@ -12,17 +12,19 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { ChatGatewayModule } from './gateway/chat-gateway.module';
 import { AiModule } from './modules/ai/ai.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     BullModule.forRoot({
-      redis: {
+      redis: process.env.REDIS_URL || {
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379'),
       },
     }),
     PrismaModule,
+    HealthModule,
     AuthModule,
     AccountsModule,
     InboxesModule,
