@@ -13,7 +13,7 @@ services:
     rootDir: .
     buildCommand: |
       npm install -g pnpm &&
-      pnpm install &&
+      NODE_ENV=development pnpm install &&
       cd apps/api &&
       ./node_modules/.bin/prisma generate &&
       ./node_modules/.bin/nest build
