@@ -15,9 +15,9 @@ services:
       npm install -g pnpm &&
       pnpm install &&
       cd apps/api &&
-      npx prisma generate &&
-      npx nest build
-    startCommand: cd apps/api && npx prisma db push --skip-generate && node dist/main.js
+      pnpm exec prisma generate &&
+      pnpm exec nest build
+    startCommand: cd apps/api && pnpm exec prisma db push --skip-generate && node dist/main.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
