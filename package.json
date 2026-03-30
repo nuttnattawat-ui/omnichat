@@ -17,5 +17,8 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "turbo": "^2.3.0"
+  }
 }
