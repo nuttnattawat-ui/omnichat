@@ -1,0 +1,147 @@
+import { Process, Processor } from '@nestjs/bull';
+import { Logger } from '@nestjs/common';
+import { Job } from 'bull';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { NormalizedMessage } from '../common/interfaces/normalized-message.interface';
+import { ChatGateway } from '../gateway/chat.gateway';
+import { AiService } from '../modules/ai/ai.service';
+
+@Processor('messages')
+export class MessageProcessor {
+  private readonly logger = new Logger(MessageProcessor.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly chatGateway: ChatGateway,
+    private readonly aiService: AiService,
+  ) {}
+
+  @Process('process-incoming')
+  async handleIncomingMessage(job: Job<NormalizedMessage>) {
+    const msg = job.data;
+    this.logger.log(
+      `Processing ${msg.channel} message: ${msg.platformMessageId}`,
+    );
+
+    // 1. Find or create inbox
+    const inbox = await this.prisma.inbox.findFirst({
+      where: { channelType: msg.channel, enabled: true },
+    });
+
+    if (!inbox) {
+      this.logger.warn(`No active inbox for channel: ${msg.channel}`);
+      return;
+    }
+
+    // 2. Dedup check
+    const existing = await this.prisma.message.findUnique({
+      where: {
+        sourceId_inboxId: {
+          sourceId: msg.platformMessageId,
+          inboxId: inbox.id,
+        },
+      },
+    });
+
+    if (existing) {
+      this.logger.warn(`Duplicate message: ${msg.platformMessageId}`);
+      return;
+    }
+
+    // 3. Find or create contact
+    let contactInbox = await this.prisma.contactInbox.findUnique({
+      where: {
+        inboxId_sourceId: {
+          inboxId: inbox.id,
+          sourceId: msg.sender.platformId,
+        },
+      },
+      include: { contact: true },
+    });
+
+    if (!contactInbox) {
+      const contact = await this.prisma.contact.create({
+        data: {
+          accountId: inbox.accountId,
+          name: msg.sender.displayName || `${msg.channel} user`,
+          avatarUrl: msg.sender.avatarUrl,
+        },
+      });
+
+      contactInbox = await this.prisma.contactInbox.create({
+        data: {
+          contactId: contact.id,
+          inboxId: inbox.id,
+          sourceId: msg.sender.platformId,
+        },
+        include: { contact: true },
+      });
+    }
+
+    // 4. Find or create conversation
+    let conversation = await this.prisma.conversation.findFirst({
+      where: {
+        inboxId: inbox.id,
+        contactId: contactInbox.contactId,
+        status: { in: ['open', 'pending'] },
+      },
+    });
+
+    if (!conversation) {
+      conversation = await this.prisma.conversation.create({
+        data: {
+          accountId: inbox.accountId,
+          inboxId: inbox.id,
+          contactId: contactInbox.contactId,
+          status: 'open',
+        },
+      });
+    }
+
+    // 5. Save message
+    const savedMessage = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        accountId: inbox.accountId,
+        inboxId: inbox.id,
+        messageType: 'incoming',
+        content: msg.content,
+        contentType: msg.contentType,
+        contentAttributes: JSON.parse(JSON.stringify(msg.contentAttributes ?? {})),
+        sourceId: msg.platformMessageId,
+        senderId: contactInbox.contactId,
+        senderType: 'Contact',
+      },
+    });
+
+    // 6. Update conversation
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        lastActivityAt: new Date(),
+        waitingSince: new Date(),
+        messagesCount: { increment: 1 },
+      },
+    });
+
+    // 7. Broadcast via WebSocket
+    this.chatGateway.broadcastMessage(conversation.id, {
+      ...savedMessage,
+      senderName: contactInbox.contact.name,
+      channel: msg.channel,
+    });
+
+    // 8. AI auto-reply if enabled
+    if (inbox.aiEnabled && msg.contentType === 'text') {
+      await this.aiService.handleAutoReply(
+        conversation.id,
+        inbox,
+        msg,
+      );
+    }
+
+    this.logger.log(
+      `Message saved: conv=${conversation.id} msg=${savedMessage.id}`,
+    );
+  }
+}

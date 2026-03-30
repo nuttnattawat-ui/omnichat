@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// Organization / Team
+// =============================================
+model Account {
+  id        Int      @id @default(autoincrement())
+  name      String
+  plan      String   @default("free")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users         User[]
+  inboxes       Inbox[]
+  contacts      Contact[]
+  conversations Conversation[]
+  messages      Message[]
+
+  @@map("accounts")
+}
+
+// =============================================
+// Users (Agents / Admins)
+// =============================================
+model User {
+  id        Int      @id @default(autoincrement())
+  accountId Int      @map("account_id")
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("agent") // admin, agent
+  avatarUrl String?  @map("avatar_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account              Account        @relation(fields: [accountId], references: [id])
+  assignedConversations Conversation[] @relation("assignee")
+  sentMessages         Message[]      @relation("sender_user")
+
+  @@map("users")
+}
+
+// =============================================
+// Channels (LINE Bot, FB Page, IG Account)
+// =============================================
+model Inbox {
+  id            Int      @id @default(autoincrement())
+  accountId     Int      @map("account_id")
+  channelType   String   @map("channel_type") // line, facebook, instagram
+  channelConfig Json     @map("channel_config") // token, secret, page_id etc.
+  name          String
+  enabled       Boolean  @default(true)
+  greeting      String?  // Auto greeting message
+  autoReply     Boolean  @default(false) @map("auto_reply")
+  aiEnabled     Boolean  @default(false) @map("ai_enabled") // Enable AI chatbot
+  aiPrompt      String?  @map("ai_prompt") // Custom AI system prompt
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  account        Account         @relation(fields: [accountId], references: [id])
+  contactInboxes ContactInbox[]
+  conversations  Conversation[]
+  messages       Message[]
+
+  @@map("inboxes")
+}
+
+// =============================================
+// Customers (unified across channels)
+// =============================================
+model Contact {
+  id               Int      @id @default(autoincrement())
+  accountId        Int      @map("account_id")
+  name             String?
+  email            String?
+  phone            String?
+  avatarUrl        String?  @map("avatar_url")
+  customAttributes Json     @default("{}") @map("custom_attributes")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  account        Account         @relation(fields: [accountId], references: [id])
+  contactInboxes ContactInbox[]
+  conversations  Conversation[]
+
+  @@map("contacts")
+}
+
+// =============================================
+// Link contact to each channel
+// =============================================
+model ContactInbox {
+  id        Int      @id @default(autoincrement())
+  contactId Int      @map("contact_id")
+  inboxId   Int      @map("inbox_id")
+  sourceId  String   @map("source_id") // LINE userId / FB PSID / IG user ID
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contact Contact @relation(fields: [contactId], references: [id])
+  inbox   Inbox   @relation(fields: [inboxId], references: [id])
+
+  @@unique([inboxId, sourceId])
+  @@map("contact_inboxes")
+}
+
+// =============================================
+// Conversations
+// =============================================
+model Conversation {
+  id             Int       @id @default(autoincrement())
+  accountId      Int       @map("account_id")
+  inboxId        Int       @map("inbox_id")
+  contactId      Int       @map("contact_id")
+  assigneeId     Int?      @map("assignee_id")
+  status         String    @default("open") // open, resolved, pending, snoozed
+  priority       String?   // low, medium, high, urgent
+  messagesCount  Int       @default(0) @map("messages_count")
+  lastActivityAt DateTime  @default(now()) @map("last_activity_at")
+  waitingSince   DateTime? @map("waiting_since")
+  firstReplyAt   DateTime? @map("first_reply_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  account  Account  @relation(fields: [accountId], references: [id])
+  inbox    Inbox    @relation(fields: [inboxId], references: [id])
+  contact  Contact  @relation(fields: [contactId], references: [id])
+  assignee User?    @relation("assignee", fields: [assigneeId], references: [id])
+  messages Message[]
+
+  @@index([accountId, status, lastActivityAt(sort: Desc)])
+  @@map("conversations")
+}
+
+// =============================================
+// Messages
+// =============================================
+model Message {
+  id                Int      @id @default(autoincrement())
+  conversationId    Int      @map("conversation_id")
+  accountId         Int      @map("account_id")
+  inboxId           Int      @map("inbox_id")
+  messageType       String   @map("message_type") // incoming, outgoing, activity, note
+  content           String?
+  contentType       String   @default("text") @map("content_type") // text, image, video, file, sticker
+  contentAttributes Json     @default("{}") @map("content_attributes")
+  sourceId          String?  @map("source_id") // platform message ID for dedup
+  senderId          Int?     @map("sender_id")
+  senderType        String?  @map("sender_type") // Contact, User, Bot
+  private           Boolean  @default(false) // internal note
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  conversation  Conversation @relation(fields: [conversationId], references: [id])
+  account       Account      @relation(fields: [accountId], references: [id])
+  inbox         Inbox        @relation(fields: [inboxId], references: [id])
+  senderUser    User?        @relation("sender_user", fields: [senderId], references: [id])
+
+  @@unique([sourceId, inboxId])
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("messages")
+}

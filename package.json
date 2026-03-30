@@ -1,0 +1,21 @@
+{
+  "name": "omnichat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Omnichannel Chat Platform - LINE, Facebook, Instagram unified inbox",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "dev:api": "pnpm --filter @omnichat/api dev",
+    "dev:web": "pnpm --filter @omnichat/web dev",
+    "build:api": "pnpm --filter @omnichat/api build",
+    "build:web": "pnpm --filter @omnichat/web build",
+    "db:generate": "pnpm --filter @omnichat/api prisma:generate",
+    "db:migrate": "pnpm --filter @omnichat/api prisma:migrate",
+    "db:push": "pnpm --filter @omnichat/api prisma:push",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
