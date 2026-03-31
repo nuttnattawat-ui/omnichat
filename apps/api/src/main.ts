@@ -8,7 +8,9 @@ async function bootstrap() {
 
   app.use(helmet());
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL
+      ? process.env.FRONTEND_URL.split(',').map((u) => u.trim())
+      : 'http://localhost:3000',
     credentials: true,
   });
 
