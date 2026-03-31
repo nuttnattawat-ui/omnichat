@@ -76,7 +76,7 @@ export class MessagesService {
 
       if (contactInbox) {
         const config = conversation.inbox.channelConfig as Record<string, string>;
-        const outgoing = { content: data.content, contentType: (data.contentType || 'text') as any };
+        const outgoing = { conversationId, content: data.content, contentType: (data.contentType || 'text') as any };
 
         try {
           switch (conversation.inbox.channelType) {
