@@ -17,12 +17,29 @@ import { HealthModule } from './modules/health/health.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    BullModule.forRoot({
-      redis: process.env.REDIS_URL || {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-      },
-    }),
+    BullModule.forRoot(
+      process.env.REDIS_URL
+        ? {
+            redis: {
+              ...((): Record<string, unknown> => {
+                const url = new URL(process.env.REDIS_URL!);
+                return {
+                  host: url.hostname,
+                  port: parseInt(url.port || '6379'),
+                  password: url.password || undefined,
+                  username: url.username || undefined,
+                  tls: url.protocol === 'rediss:' ? {} : undefined,
+                };
+              })(),
+            },
+          }
+        : {
+            redis: {
+              host: process.env.REDIS_HOST || 'localhost',
+              port: parseInt(process.env.REDIS_PORT || '6379'),
+            },
+          },
+    ),
     PrismaModule,
     HealthModule,
     AuthModule,
