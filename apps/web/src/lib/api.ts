@@ -35,8 +35,7 @@ class ApiClient {
       ...(options.headers as Record<string, string>),
     };
 
-    let res: Response;
-    let lastError: Error | null = null;
+    let res: Response | null = null;
 
     // Retry up to 2 times for cold start (Render free tier sleeps after 15min)
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -46,17 +45,16 @@ class ApiClient {
           headers,
           signal: AbortSignal.timeout(90_000), // 90s timeout for cold start
         });
-        lastError = null;
         break;
       } catch (err) {
-        lastError = err instanceof Error ? err : new Error('Network error');
-        if (attempt < 2) {
-          await new Promise((r) => setTimeout(r, 2000));
+        if (attempt === 2) {
+          throw new Error('เซิร์ฟเวอร์กำลังเริ่มระบบ กรุณาลองอีกครั้ง');
         }
+        await new Promise((r) => setTimeout(r, 2000));
       }
     }
 
-    if (lastError) {
+    if (!res) {
       throw new Error('เซิร์ฟเวอร์กำลังเริ่มระบบ กรุณาลองอีกครั้ง');
     }
 
