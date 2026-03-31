@@ -12,7 +12,17 @@
       "Bash(npx next:*)",
       "Bash(git init:*)",
       "Bash(gh auth:*)",
-      "Bash(gh repo:*)"
+      "Bash(gh repo:*)",
+      "Bash(pnpm --version)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://omnichat-api.onrender.com/api/health)",
+      "Bash(curl -s -X POST https://omnichat-api.onrender.com/api/auth/register -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"test\"\",\"\"email\"\":\"\"test@test.com\"\",\"\"password\"\":\"\"test1234\"\"}')",
+      "Bash(curl -v -X POST https://omnichat-api.onrender.com/api/auth/register -H \"Content-Type: application/json\" -d '{\"\"name\"\":\"\"test\"\",\"\"email\"\":\"\"test@test.com\"\",\"\"password\"\":\"\"test1234\"\"}')",
+      "Bash(ls -la /Users/bunnyphone/Desktop/Chatbot/apps/web/src/app/\\\\\\(dashboard\\\\\\)/)",
+      "Bash(find /Users/bunnyphone/Desktop/Chatbot/apps/web/src -type f -name *.tsx -o -name *.ts)",
+      "Bash(grep -r \"modal\\\\|Modal\\\\|dialog\\\\|Dialog\" /Users/bunnyphone/Desktop/Chatbot/apps/web/src --include=*.tsx --include=*.ts)",
+      "Bash(git add:*)",
+      "Bash(curl -s https://omnichat-api.onrender.com/api/health)",
+      "Bash(curl -s -X POST https://omnichat-api.onrender.com/api/webhooks/line -H \"Content-Type: application/json\" -H \"x-line-signature: test\" -d '{\"\"events\"\":[]}')"
     ]
   }
 }

@@ -1,12 +1,10 @@
-import { Process, Processor } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NormalizedMessage } from '../common/interfaces/normalized-message.interface';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { AiService } from '../modules/ai/ai.service';
 
-@Processor('messages')
+@Injectable()
 export class MessageProcessor {
   private readonly logger = new Logger(MessageProcessor.name);
 
@@ -16,8 +14,7 @@ export class MessageProcessor {
     private readonly aiService: AiService,
   ) {}
 
-  @Process('process-incoming')
-  async handleIncomingMessage(job: Job<NormalizedMessage>) {
+  async handleIncomingMessage(job: { data: NormalizedMessage }) {
     const msg = job.data;
     this.logger.log(
       `Processing ${msg.channel} message: ${msg.platformMessageId}`,
