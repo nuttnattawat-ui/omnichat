@@ -25,11 +25,16 @@ export class WebhooksService {
     this.logger.log(`Parsed ${messages.length} LINE messages`);
 
     for (const msg of messages) {
-      await this.messagesQueue.add('process-incoming', msg, {
-        removeOnComplete: 100,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      });
+      try {
+        await this.messagesQueue.add('process-incoming', msg, {
+          removeOnComplete: 100,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 1000 },
+        });
+        this.logger.log(`Queued LINE message: ${msg.platformMessageId}`);
+      } catch (err) {
+        this.logger.error(`Failed to queue message: ${err}`);
+      }
     }
   }
 
