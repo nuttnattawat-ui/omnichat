@@ -2,13 +2,10 @@ import {
   Controller,
   Get,
   Param,
-  Query,
-  Req,
   Res,
   Logger,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
-import { JwtService } from '@nestjs/jwt';
+import { Response } from 'express';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { LineAdapter } from '../../adapters/line.adapter';
 
@@ -19,59 +16,53 @@ export class MediaController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly lineAdapter: LineAdapter,
-    private readonly jwtService: JwtService,
   ) {}
 
   /**
    * Proxy LINE message content (images, video, audio).
-   * GET /api/media/line/:messageId?token=jwt
-   * Supports token via query param (for <img> tags) or Authorization header.
+   * GET /api/media/line/:messageId
+   * LINE message IDs are 18-digit random numbers - unguessable.
    */
   @Get('line/:messageId')
   async getLineContent(
     @Param('messageId') messageId: string,
-    @Query('token') queryToken: string,
-    @Req() req: Request,
     @Res() res: Response,
   ) {
-    // Verify JWT from query param or header
-    const token = queryToken || (req.headers.authorization?.replace('Bearer ', '') ?? '');
     try {
-      this.jwtService.verify(token);
-    } catch {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-    try {
-      // Find the message to get the inbox (and its token)
+      // Find the message to get the inbox (and its LINE token)
       const message = await this.prisma.message.findFirst({
         where: { sourceId: messageId },
         include: { inbox: true },
       });
 
       if (!message) {
-        return res.status(404).json({ message: 'Message not found' });
+        this.logger.warn(`Media not found: sourceId=${messageId}`);
+        return res.status(404).json({ message: 'Not found' });
       }
 
       const config = message.inbox.channelConfig as Record<string, string>;
-      const token = config.channelAccessToken;
+      const lineToken = config.channelAccessToken;
 
-      if (!token) {
-        return res.status(500).json({ message: 'No access token configured' });
+      if (!lineToken) {
+        this.logger.error(`No channelAccessToken for inbox ${message.inboxId}`);
+        return res.status(500).json({ message: 'No access token' });
       }
 
+      this.logger.log(`Proxying LINE content: messageId=${messageId}, inboxId=${message.inboxId}`);
+
       const { buffer, contentType } = await this.lineAdapter.getMessageContent(
-        token,
+        lineToken,
         messageId,
       );
 
       res.set({
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400', // Cache 24h
+        'Cache-Control': 'public, max-age=86400',
       });
       return res.send(buffer);
     } catch (err) {
       this.logger.error(`Failed to proxy LINE content ${messageId}: ${err}`);
-      return res.status(502).json({ message: 'Failed to fetch content' });
+      return res.status(502).json({ message: 'Failed to fetch content from LINE' });
     }
   }
 }

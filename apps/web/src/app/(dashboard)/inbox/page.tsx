@@ -8,11 +8,9 @@ import { api, Message, Conversation } from '@/lib/api';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 function resolveMediaUrl(content: string, sourceId?: string): string {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-
   // If content is a proxy URL (/api/media/line/...), prepend API base
   if (content?.startsWith('/api/')) {
-    return `${API_URL}${content}${content.includes('?') ? '&' : '?'}token=${token}`;
+    return `${API_URL}${content}`;
   }
 
   // If content is a full URL, use as-is
@@ -22,7 +20,7 @@ function resolveMediaUrl(content: string, sourceId?: string): string {
 
   // Fallback: if content is empty but we have sourceId (LINE message ID), construct proxy URL
   if (sourceId) {
-    return `${API_URL}/api/media/line/${sourceId}?token=${token}`;
+    return `${API_URL}/api/media/line/${sourceId}`;
   }
 
   return '';
@@ -152,22 +150,44 @@ function ConversationItem({
 function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
   const stickerId = attrs?.stickerId != null ? String(attrs.stickerId) : undefined;
   const packageId = attrs?.packageId != null ? String(attrs.packageId) : undefined;
+
   if (!stickerId) {
-    return <span className="text-2xl">🎉</span>;
+    return (
+      <div className="flex h-[80px] w-[80px] items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+        <span className="text-3xl">😊</span>
+      </div>
+    );
   }
+
+  // Try multiple LINE sticker CDN formats
+  const urls = [
+    `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker.png`,
+    `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`,
+    `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`,
+  ];
+
   return (
     <img
-      src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker.png`}
+      src={urls[0]}
       alt="sticker"
       className="h-[120px] w-[120px] object-contain"
+      data-urls={JSON.stringify(urls)}
+      data-url-index="0"
       onError={(e) => {
         const img = e.target as HTMLImageElement;
-        // Try android URL as fallback, then show emoji
-        if (img.src.includes('/iPhone/')) {
-          img.src = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`;
+        const allUrls = JSON.parse(img.dataset.urls || '[]');
+        const currentIndex = parseInt(img.dataset.urlIndex || '0');
+        const nextIndex = currentIndex + 1;
+        if (nextIndex < allUrls.length) {
+          img.dataset.urlIndex = String(nextIndex);
+          img.src = allUrls[nextIndex];
         } else {
+          // All URLs failed — show emoji fallback
           img.style.display = 'none';
-          img.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-4xl">🎉</span>');
+          const fallback = document.createElement('div');
+          fallback.className = 'flex h-[80px] w-[80px] items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100';
+          fallback.innerHTML = '<span class="text-3xl">😊</span>';
+          img.parentElement?.appendChild(fallback);
         }
       }}
     />

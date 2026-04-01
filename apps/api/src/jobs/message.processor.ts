@@ -154,8 +154,12 @@ export class MessageProcessor {
       });
     }
 
-    // 5. Resolve content URL for media messages (LINE images/video/audio)
+    // 5. Resolve content for non-text messages
     let messageContent = msg.content;
+    this.logger.log(
+      `Message type=${msg.contentType}, content="${messageContent?.substring(0, 50)}", attrs=${JSON.stringify(msg.contentAttributes ?? {}).substring(0, 200)}`,
+    );
+
     if (
       msg.channel === 'line' &&
       ['image', 'video', 'audio'].includes(msg.contentType) &&
@@ -163,7 +167,7 @@ export class MessageProcessor {
     ) {
       // Store proxy URL so frontend can load the image through our API
       messageContent = `/api/media/line/${msg.platformMessageId}`;
-      this.logger.log(`LINE media message: using proxy URL ${messageContent}`);
+      this.logger.log(`LINE media: proxy URL ${messageContent}`);
     }
 
     // 5. Save message
