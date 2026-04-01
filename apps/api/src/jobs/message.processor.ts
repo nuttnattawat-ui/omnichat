@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { NormalizedMessage } from '../common/interfaces/normalized-message.interface';
 import { ChatGateway } from '../gateway/chat.gateway';
 import { AiService } from '../modules/ai/ai.service';
+import { MessagesService } from '../modules/messages/messages.service';
 
 @Injectable()
 export class MessageProcessor {
@@ -12,6 +13,7 @@ export class MessageProcessor {
     private readonly prisma: PrismaService,
     private readonly chatGateway: ChatGateway,
     private readonly aiService: AiService,
+    private readonly messagesService: MessagesService,
   ) {}
 
   async handleIncomingMessage(job: { data: NormalizedMessage }) {
@@ -120,6 +122,11 @@ export class MessageProcessor {
         messagesCount: { increment: 1 },
       },
     });
+
+    // 6.5 Store replyToken for quick replies (LINE)
+    if (msg.replyToken) {
+      this.messagesService.storeReplyToken(conversation.id, msg.replyToken);
+    }
 
     // 7. Broadcast via WebSocket
     this.chatGateway.broadcastMessage(conversation.id, {

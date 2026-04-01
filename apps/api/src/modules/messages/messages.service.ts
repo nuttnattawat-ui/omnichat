@@ -8,12 +8,40 @@ import { FacebookAdapter } from '../../adapters/facebook.adapter';
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
 
+  // In-memory cache of replyTokens (conversationId -> { token, timestamp })
+  private replyTokens = new Map<number, { token: string; timestamp: number }>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatGateway: ChatGateway,
     private readonly lineAdapter: LineAdapter,
     private readonly facebookAdapter: FacebookAdapter,
   ) {}
+
+  /** Called by MessageProcessor to store replyToken for later use */
+  storeReplyToken(conversationId: number, replyToken: string) {
+    this.replyTokens.set(conversationId, {
+      token: replyToken,
+      timestamp: Date.now(),
+    });
+  }
+
+  /** Get replyToken if still valid (within 30 seconds to be safe) */
+  private getReplyToken(conversationId: number): string | undefined {
+    const entry = this.replyTokens.get(conversationId);
+    if (!entry) return undefined;
+
+    const ageMs = Date.now() - entry.timestamp;
+    if (ageMs > 30_000) {
+      // Expired (LINE gives ~1 min but we use 30s to be safe)
+      this.replyTokens.delete(conversationId);
+      return undefined;
+    }
+
+    // Use once then delete
+    this.replyTokens.delete(conversationId);
+    return entry.token;
+  }
 
   findByConversation(conversationId: number, page = 1, limit = 50) {
     return this.prisma.message.findMany({
@@ -76,16 +104,22 @@ export class MessagesService {
 
       if (contactInbox) {
         const config = conversation.inbox.channelConfig as Record<string, string>;
-        this.logger.log(`Channel config keys: ${Object.keys(config).join(', ')}`);
-        this.logger.log(`Token length: ${(config.channelAccessToken || '').length}, starts with: ${(config.channelAccessToken || '').substring(0, 10)}...`);
         const outgoing = { conversationId, content: data.content, contentType: (data.contentType || 'text') as any };
 
         try {
           switch (conversation.inbox.channelType) {
-            case 'line':
-              await this.lineAdapter.sendMessage(config, contactInbox.sourceId, outgoing);
+            case 'line': {
+              // Try reply first (free), fallback to push
+              const replyToken = this.getReplyToken(conversationId);
+              if (replyToken) {
+                this.logger.log(`Using LINE Reply (free) for conv=${conversationId}`);
+              } else {
+                this.logger.log(`Using LINE Push for conv=${conversationId}`);
+              }
+              await this.lineAdapter.sendMessage(config, contactInbox.sourceId, outgoing, replyToken);
               this.logger.log(`Sent LINE message to ${contactInbox.sourceId}`);
               break;
+            }
             case 'facebook':
             case 'instagram':
               await this.facebookAdapter.sendMessage(config, contactInbox.sourceId, outgoing);
