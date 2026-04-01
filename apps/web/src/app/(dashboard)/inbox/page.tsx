@@ -717,23 +717,25 @@ export default function InboxPage() {
                   placeholder="Type a message..."
                   className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
                 />
-                <div className="relative">
-                  <button
-                    onClick={() => setShowStickerPicker(!showStickerPicker)}
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                    title="LINE Stickers"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </button>
-                  {showStickerPicker && (
-                    <StickerPicker
-                      onSelect={handleSendSticker}
-                      onClose={() => setShowStickerPicker(false)}
-                    />
-                  )}
-                </div>
+                {activeConversation?.inbox.channelType === 'line' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowStickerPicker(!showStickerPicker)}
+                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                      title="LINE Stickers"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </button>
+                    {showStickerPicker && (
+                      <StickerPicker
+                        onSelect={handleSendSticker}
+                        onClose={() => setShowStickerPicker(false)}
+                      />
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={handleSend}
                   disabled={!input.trim()}
