@@ -99,6 +99,32 @@ export class MessageProcessor {
       });
     }
 
+    // 3.5 Update existing contact profile if missing (for contacts created before profile fetch)
+    if (contactInbox.contact && msg.channel === 'line') {
+      const contact = contactInbox.contact;
+      if (!contact.avatarUrl || contact.name === 'line user' || contact.name?.endsWith(' user')) {
+        try {
+          const channelConfig = inbox.channelConfig as Record<string, string>;
+          const profile = await this.lineAdapter.getUserProfile(
+            channelConfig.channelAccessToken,
+            msg.sender.platformId,
+          );
+          await this.prisma.contact.update({
+            where: { id: contact.id },
+            data: {
+              name: profile.displayName,
+              avatarUrl: profile.pictureUrl,
+            },
+          });
+          contactInbox.contact.name = profile.displayName;
+          contactInbox.contact.avatarUrl = profile.pictureUrl ?? null;
+          this.logger.log(`Updated LINE profile for contact ${contact.id}: ${profile.displayName}`);
+        } catch (err) {
+          this.logger.warn(`Failed to update LINE profile: ${err}`);
+        }
+      }
+    }
+
     // 4. Find or create conversation
     let conversation = await this.prisma.conversation.findFirst({
       where: {
