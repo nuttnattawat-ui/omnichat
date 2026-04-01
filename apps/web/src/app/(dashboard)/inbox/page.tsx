@@ -7,14 +7,25 @@ import { api, Message, Conversation } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-function resolveMediaUrl(content: string): string {
-  if (!content) return '';
-  // Proxy URLs start with /api/ and need the backend base URL + auth token
-  if (content.startsWith('/api/')) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+function resolveMediaUrl(content: string, sourceId?: string): string {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+
+  // If content is a proxy URL (/api/media/line/...), prepend API base
+  if (content?.startsWith('/api/')) {
     return `${API_URL}${content}${content.includes('?') ? '&' : '?'}token=${token}`;
   }
-  return content;
+
+  // If content is a full URL, use as-is
+  if (content?.startsWith('http')) {
+    return content;
+  }
+
+  // Fallback: if content is empty but we have sourceId (LINE message ID), construct proxy URL
+  if (sourceId) {
+    return `${API_URL}/api/media/line/${sourceId}?token=${token}`;
+  }
+
+  return '';
 }
 
 const channelColors: Record<string, string> = {
@@ -169,6 +180,37 @@ function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
     );
   }
 
+  // Image - no bubble background, just the image
+  if (isImage) {
+    const imgUrl = resolveMediaUrl(msg.content, msg.sourceId);
+    return (
+      <div className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}>
+        {!isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+        {imgUrl ? (
+          <img
+            src={imgUrl}
+            alt=""
+            className="max-w-[240px] rounded-2xl shadow-sm"
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              img.style.display = 'none';
+              img.parentElement?.insertAdjacentHTML('beforeend',
+                '<div class="flex items-center gap-1.5 rounded-2xl bg-white px-4 py-3 text-xs text-gray-400 shadow-sm ring-1 ring-gray-100"><svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/></svg>Image expired</div>');
+            }}
+          />
+        ) : (
+          <div className="flex items-center gap-1.5 rounded-2xl bg-white px-4 py-3 text-xs text-gray-400 shadow-sm ring-1 ring-gray-100">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+            </svg>
+            Image
+          </div>
+        )}
+        {isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+      </div>
+    );
+  }
+
   return (
     <div
       className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}
@@ -196,11 +238,7 @@ function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
             AI Assistant
           </div>
         )}
-        {isImage ? (
-          <img src={resolveMediaUrl(msg.content)} alt="" className="max-w-[240px] rounded-lg" />
-        ) : (
-          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
-        )}
+        <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
       </div>
 
       {isIncoming && (

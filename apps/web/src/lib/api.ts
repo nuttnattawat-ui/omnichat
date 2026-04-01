@@ -213,6 +213,7 @@ export interface Message {
   content: string;
   contentType: string;
   contentAttributes?: Record<string, unknown>;
+  sourceId?: string;
   senderType: string;
   senderId?: number;
   senderName?: string;
