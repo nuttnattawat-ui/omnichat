@@ -137,6 +137,13 @@ class ApiClient {
     return this.request<Contact>(`/contacts/${id}`);
   }
 
+  updateContact(id: number, data: { name?: string; email?: string; phone?: string }) {
+    return this.request<Contact>(`/contacts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Inboxes
   getInboxes() {
     return this.request<Inbox[]>('/inboxes');
@@ -205,6 +212,7 @@ export interface Message {
   messageType: string;
   content: string;
   contentType: string;
+  contentAttributes?: Record<string, unknown>;
   senderType: string;
   senderId?: number;
   senderName?: string;

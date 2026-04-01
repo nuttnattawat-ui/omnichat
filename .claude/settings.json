@@ -22,7 +22,10 @@
       "Bash(grep -r \"modal\\\\|Modal\\\\|dialog\\\\|Dialog\" /Users/bunnyphone/Desktop/Chatbot/apps/web/src --include=*.tsx --include=*.ts)",
       "Bash(git add:*)",
       "Bash(curl -s https://omnichat-api.onrender.com/api/health)",
-      "Bash(curl -s -X POST https://omnichat-api.onrender.com/api/webhooks/line -H \"Content-Type: application/json\" -H \"x-line-signature: test\" -d '{\"\"events\"\":[]}')"
+      "Bash(curl -s -X POST https://omnichat-api.onrender.com/api/webhooks/line -H \"Content-Type: application/json\" -H \"x-line-signature: test\" -d '{\"\"events\"\":[]}')",
+      "Bash(ls -la /Users/bunnyphone/Desktop/Chatbot/apps/web/src/app/\\\\\\(dashboard\\\\\\)/inbox/)",
+      "Bash(ls -la /Users/bunnyphone/Desktop/Chatbot/apps/web/src/app/\\\\\\(dashboard\\\\\\)/contacts/)",
+      "Bash(grep -E \"\\\\.ts$\")"
     ]
   }
 }

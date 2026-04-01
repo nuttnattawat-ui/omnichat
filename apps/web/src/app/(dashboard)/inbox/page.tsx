@@ -113,22 +113,51 @@ function ConversationItem({
   );
 }
 
+function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
+  const packageId = attrs?.packageId as string | undefined;
+  const stickerId = attrs?.stickerId as string | undefined;
+  if (!packageId || !stickerId) {
+    return <span className="text-2xl">🎉</span>;
+  }
+  return (
+    <img
+      src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker.png`}
+      alt="sticker"
+      className="h-[120px] w-[120px] object-contain"
+      onError={(e) => {
+        (e.target as HTMLImageElement).src = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`;
+      }}
+    />
+  );
+}
+
 function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
   const isIncoming = msg.messageType === 'incoming';
   const isBot = msg.senderType === 'Bot';
+  const isSticker = msg.contentType === 'sticker';
+  const isImage = msg.contentType === 'image';
+
+  // Sticker - no bubble background
+  if (isSticker) {
+    return (
+      <div className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}>
+        {!isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+        <StickerView attrs={msg.contentAttributes} />
+        {isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+      </div>
+    );
+  }
 
   return (
     <div
       className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}
     >
-      {/* Time (left for outgoing) */}
       {!isIncoming && (
         <span className="mb-1 text-[10px] text-gray-400">
           {formatTime(msg.createdAt)}
         </span>
       )}
 
-      {/* Bubble */}
       <div
         className={`relative max-w-[70%] px-4 py-2.5 ${
           isIncoming
@@ -146,10 +175,13 @@ function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
             AI Assistant
           </div>
         )}
-        <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
+        {isImage ? (
+          <img src={msg.content} alt="" className="max-w-[240px] rounded-lg" />
+        ) : (
+          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
+        )}
       </div>
 
-      {/* Time (right for incoming) */}
       {isIncoming && (
         <span className="mb-1 text-[10px] text-gray-400">
           {formatTime(msg.createdAt)}
@@ -174,6 +206,9 @@ export default function InboxPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [showInfo, setShowInfo] = useState(true);
+  const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '' });
+  const [savingContact, setSavingContact] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -194,6 +229,17 @@ export default function InboxPage() {
     return () => {
       socket.emit('leave_conversation', activeConversation.id);
     };
+  }, [activeConversation]);
+
+  // Sync contact form
+  useEffect(() => {
+    if (activeConversation) {
+      setContactForm({
+        name: activeConversation.contact.name || '',
+        email: (activeConversation.contact as any).email || '',
+        phone: (activeConversation.contact as any).phone || '',
+      });
+    }
   }, [activeConversation]);
 
   // Auto-scroll to bottom
@@ -218,6 +264,19 @@ export default function InboxPage() {
       // ignore
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!activeConversation) return;
+    setSavingContact(true);
+    try {
+      await api.updateContact(activeConversation.contact.id, contactForm);
+      fetchConversations();
+    } catch {
+      // ignore
+    } finally {
+      setSavingContact(false);
     }
   };
 
@@ -350,18 +409,31 @@ export default function InboxPage() {
                   </div>
                 </div>
               </div>
-              <button
-                onClick={async () => {
-                  await api.updateConversationStatus(activeConversation.id, 'resolved');
-                  fetchConversations();
-                }}
-                className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-100"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                Resolve
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    await api.updateConversationStatus(activeConversation.id, 'resolved');
+                    fetchConversations();
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-100"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Resolve
+                </button>
+                <button
+                  onClick={() => setShowInfo(!showInfo)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                    showInfo ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:bg-gray-100'
+                  }`}
+                  title="Customer Info"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Messages */}
@@ -440,6 +512,114 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* Customer Info Panel */}
+      {activeConversation && showInfo && (
+        <div className="w-[300px] flex-shrink-0 overflow-y-auto border-l border-gray-200 bg-white">
+          {/* Contact Header */}
+          <div className="flex flex-col items-center border-b border-gray-100 px-4 py-6">
+            {activeConversation.contact.avatarUrl ? (
+              <img
+                src={activeConversation.contact.avatarUrl}
+                alt=""
+                className="mb-3 h-16 w-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-lg font-semibold text-gray-600">
+                {getInitials(activeConversation.contact.name || '?')}
+              </div>
+            )}
+            <h3 className="text-sm font-bold text-gray-900">
+              {activeConversation.contact.name}
+            </h3>
+            <span
+              className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${
+                channelColors[activeConversation.inbox.channelType] || 'bg-gray-400'
+              }`}
+            >
+              {channelIcons[activeConversation.inbox.channelType]} {activeConversation.inbox.name}
+            </span>
+          </div>
+
+          {/* Contact Info Form */}
+          <div className="space-y-3 p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Customer Info
+            </h4>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Name</label>
+              <input
+                type="text"
+                value={contactForm.name}
+                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Email</label>
+              <input
+                type="email"
+                value={contactForm.email}
+                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                placeholder="customer@email.com"
+                className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Phone</label>
+              <input
+                type="tel"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                placeholder="08X-XXX-XXXX"
+                className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+              />
+            </div>
+            <button
+              onClick={handleSaveContact}
+              disabled={savingContact}
+              className="w-full rounded-lg bg-indigo-600 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {savingContact ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+
+          {/* Conversation Details */}
+          <div className="space-y-2 border-t border-gray-100 p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Conversation
+            </h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Status</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  activeConversation.status === 'open'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {activeConversation.status}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Messages</span>
+                <span className="text-gray-900">{activeConversation.messagesCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Created</span>
+                <span className="text-gray-900">
+                  {new Date(activeConversation.lastActivityAt).toLocaleDateString('th-TH')}
+                </span>
+              </div>
+              {activeConversation.assignee && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Assignee</span>
+                  <span className="text-gray-900">{activeConversation.assignee.name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
