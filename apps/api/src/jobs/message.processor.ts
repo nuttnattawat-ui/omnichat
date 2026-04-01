@@ -121,7 +121,8 @@ export class MessageProcessor {
     // 3.5 Update contact profile from platform API (always try if name/avatar missing or stale)
     if (contactInbox.contact) {
       const contact = contactInbox.contact;
-      const needsUpdate = !contact.avatarUrl || !contact.name || contact.name === `${msg.channel} user` || contact.name?.endsWith(' user');
+      const nameLower = contact.name?.toLowerCase() || '';
+      const needsUpdate = !contact.avatarUrl || !contact.name || nameLower === `${msg.channel} user` || nameLower.endsWith(' user') || nameLower === 'unknown';
       this.logger.log(`Contact ${contact.id}: name="${contact.name}", avatarUrl=${!!contact.avatarUrl}, needsUpdate=${needsUpdate}`);
       if (needsUpdate) {
         try {

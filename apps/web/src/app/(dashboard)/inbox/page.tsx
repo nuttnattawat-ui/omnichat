@@ -433,36 +433,63 @@ export default function InboxPage() {
   const [readAt, setReadAt] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const notifAudioRef = useRef<HTMLAudioElement | null>(null);
   const assignDropdownRef = useRef<HTMLDivElement>(null);
   const labelPickerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize notification sound
+  // Initialize notification sound + data
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
   useEffect(() => {
-    // Create audio element for notification sound (Web Audio API beep)
-    const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || (window as any).webkitAudioContext)() : null;
-    if (audioCtx) {
-      notifAudioRef.current = null; // We'll use Web Audio API directly
-    }
-    // Load team members and canned responses
+    // Load team members, canned responses, labels
     api.getTeam().then(setTeamMembers).catch(() => {});
     api.getCannedResponses().then(setCannedResponses).catch(() => {});
     api.getLabels().then(setAllLabels).catch(() => {});
+
+    // Resume AudioContext on first user interaction (browser policy)
+    const resumeAudio = () => {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    };
+    document.addEventListener('click', resumeAudio, { once: false });
+    document.addEventListener('keydown', resumeAudio, { once: false });
+
+    return () => {
+      document.removeEventListener('click', resumeAudio);
+      document.removeEventListener('keydown', resumeAudio);
+    };
   }, []);
 
   const playNotificationSound = useCallback(() => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      oscillator.connect(gain);
-      gain.connect(audioCtx.destination);
-      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
-      oscillator.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + 0.3);
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      // Double beep: do-di
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+      osc1.frequency.setValueAtTime(880, ctx.currentTime); // A5
+      osc1.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 0.15);
+
+      osc2.frequency.setValueAtTime(1100, ctx.currentTime + 0.18); // C#6
+      osc2.start(ctx.currentTime + 0.18);
+      osc2.stop(ctx.currentTime + 0.35);
     } catch {
       // Audio not available
     }
