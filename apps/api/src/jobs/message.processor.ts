@@ -180,10 +180,10 @@ export class MessageProcessor {
       `Message type=${msg.contentType}, content="${messageContent?.substring(0, 50) || '(empty)'}", attrs=${JSON.stringify(msg.contentAttributes ?? {}).substring(0, 200)}`,
     );
 
-    // Download LINE image/video content immediately and store as data URL
+    // Download LINE image content immediately and store as data URL
     if (
       msg.channel === 'line' &&
-      ['image'].includes(msg.contentType) &&
+      msg.contentType === 'image' &&
       !messageContent
     ) {
       try {
@@ -198,9 +198,18 @@ export class MessageProcessor {
         this.logger.log(`LINE image downloaded: ${buffer.length} bytes, type=${contentType}`);
       } catch (err) {
         this.logger.error(`Failed to download LINE image: ${err}`);
-        // Fallback to proxy URL
         messageContent = `/api/media/line/${msg.platformMessageId}`;
       }
+    } else if (
+      msg.channel === 'line' &&
+      msg.contentType === 'sticker' &&
+      !messageContent &&
+      msg.contentAttributes?.stickerId
+    ) {
+      // For stickers, store CDN URL as content (Content API doesn't support stickers)
+      const sid = msg.contentAttributes.stickerId;
+      messageContent = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${sid}/android/sticker.png`;
+      this.logger.log(`LINE sticker CDN URL: stickerId=${sid}`);
     } else if (
       msg.channel === 'line' &&
       ['video', 'audio'].includes(msg.contentType) &&

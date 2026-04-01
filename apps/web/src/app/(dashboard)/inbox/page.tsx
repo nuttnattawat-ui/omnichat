@@ -152,9 +152,33 @@ function ConversationItem({
   );
 }
 
-function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
+function StickerView({ content, attrs }: { content?: string; attrs?: Record<string, unknown> }) {
   const stickerId = attrs?.stickerId != null ? String(attrs.stickerId) : undefined;
-  const packageId = attrs?.packageId != null ? String(attrs.packageId) : undefined;
+
+  // If content has base64 data or direct URL (downloaded from LINE API), use it directly
+  if (content && (content.startsWith('data:') || content.startsWith('http'))) {
+    return (
+      <img
+        src={content}
+        alt="sticker"
+        className="h-[120px] w-[120px] object-contain"
+        onError={(e) => {
+          const img = e.target as HTMLImageElement;
+          // Fallback to CDN if direct content fails
+          if (stickerId && !img.dataset.retried) {
+            img.dataset.retried = '1';
+            img.src = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`;
+          } else {
+            img.style.display = 'none';
+            const fallback = document.createElement('div');
+            fallback.className = 'flex h-[80px] w-[80px] items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100';
+            fallback.innerHTML = '<span class="text-3xl">😊</span>';
+            img.parentElement?.appendChild(fallback);
+          }
+        }}
+      />
+    );
+  }
 
   if (!stickerId) {
     return (
@@ -164,10 +188,11 @@ function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
     );
   }
 
-  // Try multiple LINE sticker CDN formats
+  // Try multiple LINE sticker CDN formats (official, animated, creator)
   const urls = [
     `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`,
     `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`,
+    `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker_animation.png`,
     `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker.png`,
   ];
 
@@ -187,7 +212,6 @@ function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
           img.dataset.urlIndex = String(nextIndex);
           img.src = allUrls[nextIndex];
         } else {
-          // All URLs failed — show emoji fallback
           img.style.display = 'none';
           const fallback = document.createElement('div');
           fallback.className = 'flex h-[80px] w-[80px] items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100';
@@ -229,7 +253,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
     return (
       <div className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}>
         {!isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
-        <StickerView attrs={msg.contentAttributes} />
+        <StickerView content={msg.content} attrs={msg.contentAttributes} />
         {isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
       </div>
     );
