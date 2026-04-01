@@ -65,41 +65,49 @@ export class ContactsController {
     @Param('id', ParseIntPipe) id: number,
     @Req() req: { user: { accountId: number } },
   ) {
-    const contact = await this.prisma.contact.findFirst({
-      where: { id, accountId: req.user.accountId },
-      include: {
-        contactInboxes: { include: { inbox: true } },
-      },
-    });
+    try {
+      const contact = await this.prisma.contact.findFirst({
+        where: { id, accountId: req.user.accountId },
+        include: {
+          contactInboxes: { include: { inbox: true } },
+        },
+      });
 
-    if (!contact) return { error: 'Contact not found' };
+      if (!contact) return { error: 'Contact not found' };
 
-    for (const ci of contact.contactInboxes) {
-      const config = ci.inbox.channelConfig as Record<string, string>;
-      try {
-        if (ci.inbox.channelType === 'line') {
-          const profile = await this.lineAdapter.getUserProfile(config.channelAccessToken, ci.sourceId);
-          await this.prisma.contact.update({
-            where: { id },
-            data: { name: profile.displayName, avatarUrl: profile.pictureUrl },
-          });
-          this.logger.log(`Refreshed LINE profile for contact ${id}: ${profile.displayName}`);
-          return { name: profile.displayName, avatarUrl: profile.pictureUrl };
-        } else if (ci.inbox.channelType === 'facebook' || ci.inbox.channelType === 'instagram') {
-          const profile = await this.facebookAdapter.getUserProfile(config.pageAccessToken, ci.sourceId);
-          await this.prisma.contact.update({
-            where: { id },
-            data: { name: profile.name, avatarUrl: profile.profilePic },
-          });
-          this.logger.log(`Refreshed ${ci.inbox.channelType} profile for contact ${id}: ${profile.name}`);
-          return { name: profile.name, avatarUrl: profile.profilePic };
+      this.logger.log(`Refreshing profile for contact ${id}, inboxes: ${contact.contactInboxes.length}`);
+
+      for (const ci of contact.contactInboxes) {
+        const config = ci.inbox.channelConfig as Record<string, string>;
+        this.logger.log(`Trying inbox ${ci.inbox.id} (${ci.inbox.channelType}), sourceId=${ci.sourceId}, hasToken=${!!(config.pageAccessToken || config.channelAccessToken)}`);
+        try {
+          if (ci.inbox.channelType === 'line') {
+            const profile = await this.lineAdapter.getUserProfile(config.channelAccessToken, ci.sourceId);
+            await this.prisma.contact.update({
+              where: { id },
+              data: { name: profile.displayName, avatarUrl: profile.pictureUrl },
+            });
+            this.logger.log(`Refreshed LINE profile for contact ${id}: ${profile.displayName}`);
+            return { name: profile.displayName, avatarUrl: profile.pictureUrl };
+          } else if (ci.inbox.channelType === 'facebook' || ci.inbox.channelType === 'instagram') {
+            const profile = await this.facebookAdapter.getUserProfile(config.pageAccessToken, ci.sourceId);
+            await this.prisma.contact.update({
+              where: { id },
+              data: { name: profile.name, avatarUrl: profile.profilePic },
+            });
+            this.logger.log(`Refreshed ${ci.inbox.channelType} profile for contact ${id}: ${profile.name}`);
+            return { name: profile.name, avatarUrl: profile.profilePic };
+          }
+        } catch (err) {
+          this.logger.error(`Failed to refresh profile for contact ${id}: ${err}`);
+          return { error: `Failed to fetch profile: ${err instanceof Error ? err.message : String(err)}` };
         }
-      } catch (err) {
-        this.logger.error(`Failed to refresh profile for contact ${id}: ${err}`);
-        return { error: `Failed to fetch profile: ${err}` };
       }
-    }
 
-    return { error: 'No channel inbox found' };
+      return { error: 'No channel inbox found' };
+    } catch (err) {
+      this.logger.error(`Refresh profile error for contact ${id}: ${err}`);
+      return { error: `Server error: ${err instanceof Error ? err.message : String(err)}` };
+    }
   }
 }

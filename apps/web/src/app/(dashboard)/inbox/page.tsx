@@ -1197,8 +1197,8 @@ export default function InboxPage() {
                   } else {
                     alert(result.error || 'Could not fetch profile');
                   }
-                } catch {
-                  alert('Failed to refresh');
+                } catch (err) {
+                  alert('Failed to refresh: ' + (err instanceof Error ? err.message : String(err)));
                 }
               }}
               className="mt-1 text-[10px] text-indigo-500 hover:text-indigo-700 transition"
