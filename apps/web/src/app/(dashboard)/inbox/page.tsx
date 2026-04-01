@@ -442,13 +442,20 @@ export default function InboxPage() {
   }, [activeConversation]);
 
   // Auto-scroll to bottom
+  const prevConvRef = useRef<number | null>(null);
   useEffect(() => {
-    // Immediate scroll (for text messages)
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    // Delayed scroll (wait for images/stickers to load)
+    const isNewConv = activeConversation?.id !== prevConvRef.current;
+    prevConvRef.current = activeConversation?.id ?? null;
+
+    // When opening a conversation or first load: instant scroll (no animation)
+    // When new message arrives in same conversation: smooth scroll
+    const behavior = isNewConv ? 'instant' as ScrollBehavior : 'smooth';
+    messagesEndRef.current?.scrollIntoView({ behavior });
+
+    // Delayed scroll for images/stickers loading
     const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 300);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
+    }, 150);
     return () => clearTimeout(timer);
   }, [messages, activeConversation]);
 
