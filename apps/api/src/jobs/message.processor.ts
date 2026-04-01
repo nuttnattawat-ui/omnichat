@@ -5,6 +5,7 @@ import { ChatGateway } from '../gateway/chat.gateway';
 import { AiService } from '../modules/ai/ai.service';
 import { MessagesService } from '../modules/messages/messages.service';
 import { LineAdapter } from '../adapters/line.adapter';
+import { FacebookAdapter } from '../adapters/facebook.adapter';
 
 @Injectable()
 export class MessageProcessor {
@@ -16,6 +17,7 @@ export class MessageProcessor {
     private readonly aiService: AiService,
     private readonly messagesService: MessagesService,
     private readonly lineAdapter: LineAdapter,
+    private readonly facebookAdapter: FacebookAdapter,
   ) {}
 
   async handleIncomingMessage(job: { data: NormalizedMessage }) {
@@ -64,7 +66,7 @@ export class MessageProcessor {
       let displayName = msg.sender.displayName || `${msg.channel} user`;
       let avatarUrl = msg.sender.avatarUrl;
 
-      // Fetch real profile from LINE API when creating a new contact
+      // Fetch real profile from platform API when creating a new contact
       if (msg.channel === 'line') {
         try {
           const channelConfig = inbox.channelConfig as Record<string, string>;
@@ -83,6 +85,18 @@ export class MessageProcessor {
           this.logger.error(
             `FAILED to fetch LINE profile for ${msg.sender.platformId}: ${err}`,
           );
+        }
+      } else if (msg.channel === 'facebook' || msg.channel === 'instagram') {
+        try {
+          const channelConfig = inbox.channelConfig as Record<string, string>;
+          const token = channelConfig.pageAccessToken;
+          this.logger.log(`Fetching ${msg.channel} profile for ${msg.sender.platformId}`);
+          const profile = await this.facebookAdapter.getUserProfile(token, msg.sender.platformId);
+          displayName = profile.name;
+          avatarUrl = profile.profilePic;
+          this.logger.log(`Got ${msg.channel} profile: ${profile.name}, pic: ${!!profile.profilePic}`);
+        } catch (err) {
+          this.logger.error(`FAILED to fetch ${msg.channel} profile for ${msg.sender.platformId}: ${err}`);
         }
       }
 
@@ -104,32 +118,37 @@ export class MessageProcessor {
       });
     }
 
-    // 3.5 Update contact profile from LINE API (always try if name/avatar missing or stale)
-    if (contactInbox.contact && msg.channel === 'line') {
+    // 3.5 Update contact profile from platform API (always try if name/avatar missing or stale)
+    if (contactInbox.contact) {
       const contact = contactInbox.contact;
       const needsUpdate = !contact.avatarUrl || !contact.name || contact.name === `${msg.channel} user` || contact.name?.endsWith(' user');
       this.logger.log(`Contact ${contact.id}: name="${contact.name}", avatarUrl=${!!contact.avatarUrl}, needsUpdate=${needsUpdate}`);
       if (needsUpdate) {
         try {
           const channelConfig = inbox.channelConfig as Record<string, string>;
-          const token = channelConfig.channelAccessToken;
-          this.logger.log(`Updating LINE profile, token length: ${token?.length || 0}`);
-          const profile = await this.lineAdapter.getUserProfile(
-            token,
-            msg.sender.platformId,
-          );
-          await this.prisma.contact.update({
-            where: { id: contact.id },
-            data: {
-              name: profile.displayName,
-              avatarUrl: profile.pictureUrl,
-            },
-          });
-          contactInbox.contact.name = profile.displayName;
-          contactInbox.contact.avatarUrl = profile.pictureUrl ?? null;
-          this.logger.log(`Updated LINE profile for contact ${contact.id}: ${profile.displayName}, avatar: ${profile.pictureUrl}`);
+          if (msg.channel === 'line') {
+            const token = channelConfig.channelAccessToken;
+            const profile = await this.lineAdapter.getUserProfile(token, msg.sender.platformId);
+            await this.prisma.contact.update({
+              where: { id: contact.id },
+              data: { name: profile.displayName, avatarUrl: profile.pictureUrl },
+            });
+            contactInbox.contact.name = profile.displayName;
+            contactInbox.contact.avatarUrl = profile.pictureUrl ?? null;
+            this.logger.log(`Updated LINE profile for contact ${contact.id}: ${profile.displayName}`);
+          } else if (msg.channel === 'facebook' || msg.channel === 'instagram') {
+            const token = channelConfig.pageAccessToken;
+            const profile = await this.facebookAdapter.getUserProfile(token, msg.sender.platformId);
+            await this.prisma.contact.update({
+              where: { id: contact.id },
+              data: { name: profile.name, avatarUrl: profile.profilePic },
+            });
+            contactInbox.contact.name = profile.name;
+            contactInbox.contact.avatarUrl = profile.profilePic ?? null;
+            this.logger.log(`Updated ${msg.channel} profile for contact ${contact.id}: ${profile.name}`);
+          }
         } catch (err) {
-          this.logger.error(`FAILED to update LINE profile for contact ${contact.id}: ${err}`);
+          this.logger.error(`FAILED to update profile for contact ${contact.id}: ${err}`);
         }
       }
     }

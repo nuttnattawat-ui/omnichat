@@ -17,6 +17,6 @@ export interface NormalizedMessage {
 export interface OutgoingMessage {
   conversationId: number;
   content: string;
-  contentType: 'text' | 'image' | 'video' | 'file';
+  contentType: 'text' | 'image' | 'video' | 'file' | 'sticker';
   contentAttributes?: Record<string, unknown>;
 }

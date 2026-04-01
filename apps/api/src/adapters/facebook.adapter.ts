@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { ChannelAdapter } from '../common/interfaces/channel-adapter.interface';
 import {
@@ -8,6 +8,7 @@ import {
 
 @Injectable()
 export class FacebookAdapter implements ChannelAdapter {
+  private readonly logger = new Logger(FacebookAdapter.name);
   validateSignature(rawBody: Buffer, signature: string): boolean {
     const appSecret = process.env.META_APP_SECRET || '';
     const expectedSig =
@@ -83,6 +84,25 @@ export class FacebookAdapter implements ChannelAdapter {
       file: 'file',
     };
     return map[type] || 'text';
+  }
+
+  async getUserProfile(
+    pageAccessToken: string,
+    userId: string,
+  ): Promise<{ name: string; profilePic?: string }> {
+    this.logger.log(`Fetching FB profile for ${userId}`);
+    const response = await fetch(
+      `https://graph.facebook.com/v19.0/${userId}?fields=name,profile_pic&access_token=${pageAccessToken}`,
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Facebook Profile API ${response.status}: ${error}`);
+    }
+
+    const data = await response.json() as { name?: string; profile_pic?: string };
+    this.logger.log(`FB profile: name=${data.name}, pic=${!!data.profile_pic}`);
+    return { name: data.name || 'Facebook User', profilePic: data.profile_pic };
   }
 
   async sendMessage(
