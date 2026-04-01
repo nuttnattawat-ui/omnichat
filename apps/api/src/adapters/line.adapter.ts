@@ -134,6 +134,10 @@ export class LineAdapter implements ChannelAdapter {
     token: string,
     userId: string,
   ): Promise<{ displayName: string; pictureUrl?: string }> {
+    if (!token) {
+      throw new Error('LINE channelAccessToken is empty or missing');
+    }
+
     const response = await fetch(
       `https://api.line.me/v2/bot/profile/${userId}`,
       {
@@ -142,7 +146,10 @@ export class LineAdapter implements ChannelAdapter {
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch LINE profile: ${response.status}`);
+      const body = await response.text().catch(() => '');
+      throw new Error(
+        `LINE Profile API ${response.status}: ${body} (token: ${token.substring(0, 10)}...${token.substring(token.length - 5)})`,
+      );
     }
 
     return response.json() as Promise<{

@@ -43,13 +43,22 @@ export class MessagesService {
     return entry.token;
   }
 
-  findByConversation(conversationId: number, page = 1, limit = 50) {
-    return this.prisma.message.findMany({
+  async findByConversation(conversationId: number, page = 1, limit = 50) {
+    const messages = await this.prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'asc' },
       skip: (page - 1) * limit,
       take: limit,
+      include: {
+        senderUser: { select: { name: true } },
+      },
     });
+
+    return messages.map((m) => ({
+      ...m,
+      senderName: m.senderUser?.name || (m.senderType === 'Contact' ? undefined : undefined),
+      senderUser: undefined,
+    }));
   }
 
   async createOutgoing(
@@ -90,8 +99,17 @@ export class MessagesService {
       },
     });
 
-    // Broadcast via WebSocket
-    this.chatGateway.broadcastMessage(conversationId, message);
+    // Get sender name for broadcast
+    const sender = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    // Broadcast via WebSocket (with sender name)
+    this.chatGateway.broadcastMessage(conversationId, {
+      ...message,
+      senderName: sender?.name || 'Agent',
+    });
 
     // Send to platform (unless it's a private note)
     if (!data.private) {
@@ -132,6 +150,6 @@ export class MessagesService {
       }
     }
 
-    return message;
+    return { ...message, senderName: sender?.name || 'Agent' };
   }
 }

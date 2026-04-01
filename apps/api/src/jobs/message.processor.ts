@@ -68,15 +68,20 @@ export class MessageProcessor {
       if (msg.channel === 'line') {
         try {
           const channelConfig = inbox.channelConfig as Record<string, string>;
+          const token = channelConfig.channelAccessToken;
+          this.logger.log(
+            `Fetching LINE profile for ${msg.sender.platformId}, token exists: ${!!token}, token length: ${token?.length || 0}, config keys: ${Object.keys(channelConfig).join(',')}`,
+          );
           const profile = await this.lineAdapter.getUserProfile(
-            channelConfig.channelAccessToken,
+            token,
             msg.sender.platformId,
           );
           displayName = profile.displayName;
           avatarUrl = profile.pictureUrl;
+          this.logger.log(`Got LINE profile: ${profile.displayName}, avatar: ${!!profile.pictureUrl}`);
         } catch (err) {
-          this.logger.warn(
-            `Failed to fetch LINE profile for ${msg.sender.platformId}: ${err}`,
+          this.logger.error(
+            `FAILED to fetch LINE profile for ${msg.sender.platformId}: ${err}`,
           );
         }
       }
@@ -103,11 +108,14 @@ export class MessageProcessor {
     if (contactInbox.contact && msg.channel === 'line') {
       const contact = contactInbox.contact;
       const needsUpdate = !contact.avatarUrl || !contact.name || contact.name === `${msg.channel} user` || contact.name?.endsWith(' user');
+      this.logger.log(`Contact ${contact.id}: name="${contact.name}", avatarUrl=${!!contact.avatarUrl}, needsUpdate=${needsUpdate}`);
       if (needsUpdate) {
         try {
           const channelConfig = inbox.channelConfig as Record<string, string>;
+          const token = channelConfig.channelAccessToken;
+          this.logger.log(`Updating LINE profile, token length: ${token?.length || 0}`);
           const profile = await this.lineAdapter.getUserProfile(
-            channelConfig.channelAccessToken,
+            token,
             msg.sender.platformId,
           );
           await this.prisma.contact.update({
@@ -119,9 +127,9 @@ export class MessageProcessor {
           });
           contactInbox.contact.name = profile.displayName;
           contactInbox.contact.avatarUrl = profile.pictureUrl ?? null;
-          this.logger.log(`Updated LINE profile for contact ${contact.id}: ${profile.displayName}`);
+          this.logger.log(`Updated LINE profile for contact ${contact.id}: ${profile.displayName}, avatar: ${profile.pictureUrl}`);
         } catch (err) {
-          this.logger.warn(`Failed to update LINE profile: ${err}`);
+          this.logger.error(`FAILED to update LINE profile for contact ${contact.id}: ${err}`);
         }
       }
     }
