@@ -154,6 +154,18 @@ export class MessageProcessor {
       });
     }
 
+    // 5. Resolve content URL for media messages (LINE images/video/audio)
+    let messageContent = msg.content;
+    if (
+      msg.channel === 'line' &&
+      ['image', 'video', 'audio'].includes(msg.contentType) &&
+      !messageContent
+    ) {
+      // Store proxy URL so frontend can load the image through our API
+      messageContent = `/api/media/line/${msg.platformMessageId}`;
+      this.logger.log(`LINE media message: using proxy URL ${messageContent}`);
+    }
+
     // 5. Save message
     const savedMessage = await this.prisma.message.create({
       data: {
@@ -161,7 +173,7 @@ export class MessageProcessor {
         accountId: inbox.accountId,
         inboxId: inbox.id,
         messageType: 'incoming',
-        content: msg.content,
+        content: messageContent,
         contentType: msg.contentType,
         contentAttributes: JSON.parse(JSON.stringify({
           ...(msg.contentAttributes ?? {}),

@@ -5,6 +5,18 @@ import { useChatStore } from '@/stores/chat.store';
 import { connectSocket } from '@/lib/socket';
 import { api, Message, Conversation } from '@/lib/api';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+function resolveMediaUrl(content: string): string {
+  if (!content) return '';
+  // Proxy URLs start with /api/ and need the backend base URL + auth token
+  if (content.startsWith('/api/')) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+    return `${API_URL}${content}${content.includes('?') ? '&' : '?'}token=${token}`;
+  }
+  return content;
+}
+
 const channelColors: Record<string, string> = {
   line: 'bg-[#06C755]',
   facebook: 'bg-blue-600',
@@ -185,7 +197,7 @@ function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
           </div>
         )}
         {isImage ? (
-          <img src={msg.content} alt="" className="max-w-[240px] rounded-lg" />
+          <img src={resolveMediaUrl(msg.content)} alt="" className="max-w-[240px] rounded-lg" />
         ) : (
           <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
         )}

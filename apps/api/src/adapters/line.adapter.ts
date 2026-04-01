@@ -129,6 +129,29 @@ export class LineAdapter implements ChannelAdapter {
     }
   }
 
+  /** Download message content (image/video/audio) from LINE */
+  async getMessageContent(
+    token: string,
+    messageId: string,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const response = await fetch(
+      `https://api-data.line.me/v2/bot/message/${messageId}/content`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`LINE Content API ${response.status}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      contentType: response.headers.get('content-type') || 'image/jpeg',
+    };
+  }
+
   /** Fetch user profile from LINE */
   async getUserProfile(
     token: string,

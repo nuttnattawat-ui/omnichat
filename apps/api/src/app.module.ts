@@ -11,6 +11,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { ChatGatewayModule } from './gateway/chat-gateway.module';
 import { AiModule } from './modules/ai/ai.module';
+import { MediaModule } from './modules/media/media.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -28,6 +29,7 @@ import { HealthModule } from './modules/health/health.module';
     SettingsModule,
     ChatGatewayModule,
     AiModule,
+    MediaModule,
   ],
 })
 export class AppModule {}
