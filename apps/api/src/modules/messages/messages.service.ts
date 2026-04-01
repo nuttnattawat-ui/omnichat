@@ -76,6 +76,8 @@ export class MessagesService {
 
       if (contactInbox) {
         const config = conversation.inbox.channelConfig as Record<string, string>;
+        this.logger.log(`Channel config keys: ${Object.keys(config).join(', ')}`);
+        this.logger.log(`Token length: ${(config.channelAccessToken || '').length}, starts with: ${(config.channelAccessToken || '').substring(0, 10)}...`);
         const outgoing = { conversationId, content: data.content, contentType: (data.contentType || 'text') as any };
 
         try {
