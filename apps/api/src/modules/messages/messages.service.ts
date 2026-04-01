@@ -65,7 +65,7 @@ export class MessagesService {
     conversationId: number,
     userId: number,
     accountId: number,
-    data: { content: string; contentType?: string; private?: boolean },
+    data: { content: string; contentType?: string; private?: boolean; contentAttributes?: Record<string, unknown> },
   ) {
     const conversation = await this.prisma.conversation.findFirst({
       where: { id: conversationId, accountId },
@@ -82,6 +82,7 @@ export class MessagesService {
         messageType: data.private ? 'note' : 'outgoing',
         content: data.content,
         contentType: data.contentType || 'text',
+        contentAttributes: data.contentAttributes ? JSON.parse(JSON.stringify(data.contentAttributes)) : undefined,
         senderId: userId,
         senderType: 'User',
         private: data.private || false,
@@ -122,7 +123,7 @@ export class MessagesService {
 
       if (contactInbox) {
         const config = conversation.inbox.channelConfig as Record<string, string>;
-        const outgoing = { conversationId, content: data.content, contentType: (data.contentType || 'text') as any };
+        const outgoing = { conversationId, content: data.content, contentType: (data.contentType || 'text') as any, contentAttributes: data.contentAttributes };
 
         try {
           switch (conversation.inbox.channelType) {

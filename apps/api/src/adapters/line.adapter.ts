@@ -104,6 +104,12 @@ export class LineAdapter implements ChannelAdapter {
           previewImageUrl:
             (message.contentAttributes?.thumbnailUrl as string) || '',
         };
+      case 'sticker':
+        return {
+          type: 'sticker',
+          packageId: String(message.contentAttributes?.packageId || ''),
+          stickerId: String(message.contentAttributes?.stickerId || ''),
+        };
       default:
         return { type: 'text', text: message.content };
     }

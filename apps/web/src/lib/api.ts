@@ -121,7 +121,7 @@ class ApiClient {
     );
   }
 
-  sendMessage(conversationId: number, data: { content: string; contentType?: string; private?: boolean }) {
+  sendMessage(conversationId: number, data: { content: string; contentType?: string; private?: boolean; contentAttributes?: Record<string, unknown> }) {
     return this.request<Message>(
       `/conversations/${conversationId}/messages`,
       { method: 'POST', body: JSON.stringify(data) },

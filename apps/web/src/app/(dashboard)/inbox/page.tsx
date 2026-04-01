@@ -199,7 +199,7 @@ function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
   );
 }
 
-function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
+function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boolean; onImageClick?: (url: string) => void }) {
   const isIncoming = msg.messageType === 'incoming';
   const isBot = msg.senderType === 'Bot';
   const isSticker = msg.contentType === 'sticker';
@@ -226,7 +226,8 @@ function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
           <img
             src={imgUrl}
             alt=""
-            className="max-w-[240px] rounded-2xl shadow-sm"
+            className="max-w-[240px] cursor-pointer rounded-2xl shadow-sm transition hover:opacity-90"
+            onClick={() => onImageClick?.(imgUrl)}
             onError={(e) => {
               const img = e.target as HTMLImageElement;
               img.style.display = 'none';
@@ -286,6 +287,78 @@ function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
   );
 }
 
+// LINE official sticker packages (free/common ones)
+const STICKER_PACKAGES = [
+  {
+    packageId: '11537',
+    name: 'Brown & Cony',
+    stickers: ['52002734','52002735','52002736','52002737','52002738','52002739','52002740','52002741','52002742','52002743','52002744','52002745','52002746','52002747','52002748','52002749','52002750','52002751','52002752','52002753','52002754','52002755','52002756','52002757','52002758','52002759','52002760','52002761','52002762','52002763','52002764','52002765','52002766','52002767','52002768','52002769','52002770','52002771','52002772','52002773'],
+  },
+  {
+    packageId: '11538',
+    name: 'Brown & Friends',
+    stickers: ['51626494','51626495','51626496','51626497','51626498','51626499','51626500','51626501','51626502','51626503','51626504','51626505','51626506','51626507','51626508','51626509','51626510','51626511','51626512','51626513','51626514','51626515','51626516','51626517','51626518','51626519','51626520','51626521','51626522','51626523','51626524','51626525','51626526','51626527','51626528','51626529','51626530','51626531','51626532','51626533'],
+  },
+  {
+    packageId: '11539',
+    name: 'CHOCO & Friends',
+    stickers: ['52114110','52114111','52114112','52114113','52114114','52114115','52114116','52114117','52114118','52114119','52114120','52114121','52114122','52114123','52114124','52114125','52114126','52114127','52114128','52114129','52114130','52114131','52114132','52114133','52114134','52114135','52114136','52114137','52114138','52114139','52114140','52114141','52114142','52114143','52114144','52114145','52114146','52114147','52114148','52114149'],
+  },
+];
+
+function StickerPicker({ onSelect, onClose }: { onSelect: (packageId: string, stickerId: string) => void; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState(0);
+  const pkg = STICKER_PACKAGES[activeTab];
+
+  return (
+    <div className="absolute bottom-12 right-0 z-50 w-[320px] rounded-xl border border-gray-200 bg-white shadow-xl">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+        <span className="text-xs font-semibold text-gray-600">Stickers</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      {/* Package tabs */}
+      <div className="flex gap-1 border-b border-gray-100 px-2 py-1.5">
+        {STICKER_PACKAGES.map((p, i) => (
+          <button
+            key={p.packageId}
+            onClick={() => setActiveTab(i)}
+            className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+              activeTab === i ? 'bg-[#06C755] text-white' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            {p.name}
+          </button>
+        ))}
+      </div>
+      {/* Sticker grid */}
+      <div className="grid max-h-[240px] grid-cols-4 gap-1 overflow-y-auto p-2">
+        {pkg.stickers.map((stickerId) => (
+          <button
+            key={stickerId}
+            onClick={() => onSelect(pkg.packageId, stickerId)}
+            className="flex items-center justify-center rounded-lg p-1 transition hover:bg-gray-100"
+          >
+            <img
+              src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker.png`}
+              alt=""
+              className="h-16 w-16 object-contain"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.opacity = '0.3';
+              }}
+            />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function InboxPage() {
   const {
     conversations,
@@ -306,6 +379,8 @@ export default function InboxPage() {
   const [showInfo, setShowInfo] = useState(true);
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '' });
   const [savingContact, setSavingContact] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -383,6 +458,15 @@ export default function InboxPage() {
     } finally {
       setSavingContact(false);
     }
+  };
+
+  const handleSendSticker = async (packageId: string, stickerId: string) => {
+    if (!activeConversation) return;
+    setShowStickerPicker(false);
+    await sendMessage(activeConversation.id, '', false, {
+      contentType: 'sticker',
+      contentAttributes: { packageId, stickerId },
+    });
   };
 
   const filteredConversations = conversations
@@ -558,6 +642,7 @@ export default function InboxPage() {
                         key={msg.id}
                         msg={msg}
                         isLast={i === group.msgs.length - 1}
+                        onImageClick={(url) => setLightboxUrl(url)}
                       />
                     ))}
                   </div>
@@ -594,6 +679,23 @@ export default function InboxPage() {
                   placeholder="Type a message..."
                   className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-[#06C755] focus:outline-none focus:ring-1 focus:ring-[#06C755]/30"
                 />
+                <div className="relative">
+                  <button
+                    onClick={() => setShowStickerPicker(!showStickerPicker)}
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                    title="Send Sticker"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  {showStickerPicker && (
+                    <StickerPicker
+                      onSelect={handleSendSticker}
+                      onClose={() => setShowStickerPicker(false)}
+                    />
+                  )}
+                </div>
                 <button
                   onClick={handleSend}
                   disabled={!input.trim()}
@@ -618,6 +720,29 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* Lightbox Modal */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       {/* Customer Info Panel */}
       {activeConversation && showInfo && (

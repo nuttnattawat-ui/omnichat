@@ -32,7 +32,7 @@ export class MessagesController {
   create(
     @Param('conversationId', ParseIntPipe) conversationId: number,
     @Req() req: { user: { userId: number; accountId: number } },
-    @Body() body: { content: string; contentType?: string; private?: boolean },
+    @Body() body: { content: string; contentType?: string; private?: boolean; contentAttributes?: Record<string, unknown> },
   ) {
     return this.messagesService.createOutgoing(
       conversationId,

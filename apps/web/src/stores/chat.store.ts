@@ -37,6 +37,7 @@ interface ChatState {
     conversationId: number,
     content: string,
     isPrivate?: boolean,
+    options?: { contentType?: string; contentAttributes?: Record<string, unknown> },
   ) => Promise<void>;
   markAsRead: (conversationId: number) => void;
   getUnreadCount: (conversationId: number, totalMessages: number) => number;
@@ -80,10 +81,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  sendMessage: async (conversationId, content, isPrivate = false) => {
+  sendMessage: async (conversationId, content, isPrivate = false, options) => {
     const message = await api.sendMessage(conversationId, {
       content,
       private: isPrivate,
+      contentType: options?.contentType,
+      contentAttributes: options?.contentAttributes,
     });
     get().addMessage(message);
     // Mark as read after sending (agent is active in this conversation)
