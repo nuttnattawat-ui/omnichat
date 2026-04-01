@@ -82,7 +82,18 @@ function ConversationItem({
   unreadCount: number;
   onClick: () => void;
 }) {
-  const lastMsg = conv.messages?.[0]?.content || (conv.messages?.[0]?.contentType === 'sticker' ? '🎉 Sticker' : '');
+  const lastMsgObj = conv.messages?.[0];
+  const lastMsg = lastMsgObj
+    ? lastMsgObj.contentType === 'image' || lastMsgObj.content?.startsWith('/api/media/')
+      ? '📷 รูปภาพ'
+      : lastMsgObj.contentType === 'sticker'
+        ? '🎉 Sticker'
+        : lastMsgObj.contentType === 'video'
+          ? '🎬 วิดีโอ'
+          : lastMsgObj.contentType === 'audio'
+            ? '🎵 เสียง'
+            : lastMsgObj.content || ''
+    : '';
   return (
     <button
       onClick={onClick}
