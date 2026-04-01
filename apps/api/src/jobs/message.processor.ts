@@ -4,6 +4,7 @@ import { NormalizedMessage } from '../common/interfaces/normalized-message.inter
 import { ChatGateway } from '../gateway/chat.gateway';
 import { AiService } from '../modules/ai/ai.service';
 import { MessagesService } from '../modules/messages/messages.service';
+import { LineAdapter } from '../adapters/line.adapter';
 
 @Injectable()
 export class MessageProcessor {
@@ -14,6 +15,7 @@ export class MessageProcessor {
     private readonly chatGateway: ChatGateway,
     private readonly aiService: AiService,
     private readonly messagesService: MessagesService,
+    private readonly lineAdapter: LineAdapter,
   ) {}
 
   async handleIncomingMessage(job: { data: NormalizedMessage }) {
@@ -59,11 +61,31 @@ export class MessageProcessor {
     });
 
     if (!contactInbox) {
+      let displayName = msg.sender.displayName || `${msg.channel} user`;
+      let avatarUrl = msg.sender.avatarUrl;
+
+      // Fetch real profile from LINE API when creating a new contact
+      if (msg.channel === 'line') {
+        try {
+          const channelConfig = inbox.channelConfig as Record<string, string>;
+          const profile = await this.lineAdapter.getUserProfile(
+            channelConfig.channelAccessToken,
+            msg.sender.platformId,
+          );
+          displayName = profile.displayName;
+          avatarUrl = profile.pictureUrl;
+        } catch (err) {
+          this.logger.warn(
+            `Failed to fetch LINE profile for ${msg.sender.platformId}: ${err}`,
+          );
+        }
+      }
+
       const contact = await this.prisma.contact.create({
         data: {
           accountId: inbox.accountId,
-          name: msg.sender.displayName || `${msg.channel} user`,
-          avatarUrl: msg.sender.avatarUrl,
+          name: displayName,
+          avatarUrl,
         },
       });
 

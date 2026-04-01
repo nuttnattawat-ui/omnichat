@@ -1,21 +1,163 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '@/stores/chat.store';
 import { connectSocket } from '@/lib/socket';
-import { api, Message } from '@/lib/api';
+import { api, Message, Conversation } from '@/lib/api';
 
 const channelColors: Record<string, string> = {
-  line: 'bg-green-500',
+  line: 'bg-[#06C755]',
   facebook: 'bg-blue-600',
-  instagram: 'bg-pink-500',
+  instagram: 'bg-gradient-to-tr from-purple-500 via-pink-500 to-orange-400',
 };
 
-const channelLabels: Record<string, string> = {
+const channelIcons: Record<string, string> = {
   line: 'LINE',
   facebook: 'FB',
   instagram: 'IG',
 };
+
+function formatTime(dateStr: string) {
+  return new Date(dateStr).toLocaleTimeString('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatDate(dateStr: string) {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  });
+}
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+function ConversationItem({
+  conv,
+  isActive,
+  onClick,
+}: {
+  conv: Conversation;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const lastMsg = conv.messages?.[0]?.content || '';
+  return (
+    <button
+      onClick={onClick}
+      className={`group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+        isActive
+          ? 'bg-[#06C755]/10 border-l-[3px] border-[#06C755]'
+          : 'hover:bg-gray-50 border-l-[3px] border-transparent'
+      }`}
+    >
+      {/* Avatar */}
+      <div className="relative flex-shrink-0">
+        {conv.contact.avatarUrl ? (
+          <img
+            src={conv.contact.avatarUrl}
+            alt={conv.contact.name}
+            className="h-12 w-12 rounded-full object-cover"
+          />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
+            {getInitials(conv.contact.name || '?')}
+          </div>
+        )}
+        {/* Channel indicator */}
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold text-white ring-2 ring-white ${
+            channelColors[conv.inbox.channelType] || 'bg-gray-400'
+          }`}
+        >
+          {conv.inbox.channelType === 'line' ? 'L' : conv.inbox.channelType === 'facebook' ? 'F' : 'I'}
+        </span>
+      </div>
+
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between">
+          <span className="truncate text-sm font-semibold text-gray-900">
+            {conv.contact.name || 'Unknown'}
+          </span>
+          <span className="flex-shrink-0 text-xs text-gray-400">
+            {formatTime(conv.lastActivityAt)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="truncate text-xs text-gray-500">{lastMsg || 'No messages yet'}</p>
+          {conv.status === 'open' && conv.messagesCount > 0 && (
+            <span className="ml-2 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-[#06C755] px-1.5 text-[10px] font-bold text-white">
+              {conv.messagesCount > 99 ? '99+' : conv.messagesCount}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ChatBubble({ msg, isLast }: { msg: Message; isLast: boolean }) {
+  const isIncoming = msg.messageType === 'incoming';
+  const isBot = msg.senderType === 'Bot';
+
+  return (
+    <div
+      className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}
+    >
+      {/* Time (left for outgoing) */}
+      {!isIncoming && (
+        <span className="mb-1 text-[10px] text-gray-400">
+          {formatTime(msg.createdAt)}
+        </span>
+      )}
+
+      {/* Bubble */}
+      <div
+        className={`relative max-w-[70%] px-4 py-2.5 ${
+          isIncoming
+            ? 'rounded-2xl rounded-bl-md bg-white text-gray-900 shadow-sm ring-1 ring-gray-100'
+            : isBot
+              ? 'rounded-2xl rounded-br-md bg-purple-500 text-white'
+              : 'rounded-2xl rounded-br-md bg-[#06C755] text-white'
+        }`}
+      >
+        {isBot && (
+          <div className="mb-0.5 flex items-center gap-1 text-[10px] font-medium opacity-80">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+            AI Assistant
+          </div>
+        )}
+        <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
+      </div>
+
+      {/* Time (right for incoming) */}
+      {isIncoming && (
+        <span className="mb-1 text-[10px] text-gray-400">
+          {formatTime(msg.createdAt)}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function InboxPage() {
   const {
@@ -30,21 +172,21 @@ export default function InboxPage() {
 
   const [input, setInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchConversations();
-
     const socket = connectSocket();
     socket.on('new_message', (msg: Message) => {
       addMessage(msg);
     });
-
     return () => {
       socket.off('new_message');
     };
   }, [fetchConversations, addMessage]);
 
-  // Join conversation room when active changes
   useEffect(() => {
     if (!activeConversation) return;
     const socket = connectSocket();
@@ -54,10 +196,16 @@ export default function InboxPage() {
     };
   }, [activeConversation]);
 
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const handleSend = async () => {
     if (!input.trim() || !activeConversation) return;
-    await sendMessage(activeConversation.id, input);
+    const text = input;
     setInput('');
+    await sendMessage(activeConversation.id, text);
   };
 
   const handleAiSuggest = async () => {
@@ -73,174 +221,222 @@ export default function InboxPage() {
     }
   };
 
+  const filteredConversations = conversations
+    .filter((c) => {
+      if (filter === 'open') return c.status === 'open';
+      if (filter === 'resolved') return c.status === 'resolved';
+      return true;
+    })
+    .filter((c) => {
+      if (!search) return true;
+      return c.contact.name?.toLowerCase().includes(search.toLowerCase());
+    });
+
+  // Group messages by date
+  const groupedMessages: { date: string; msgs: Message[] }[] = [];
+  let currentDate = '';
+  for (const msg of messages) {
+    const date = formatDate(msg.createdAt);
+    if (date !== currentDate) {
+      currentDate = date;
+      groupedMessages.push({ date, msgs: [] });
+    }
+    groupedMessages[groupedMessages.length - 1].msgs.push(msg);
+  }
+
   return (
     <div className="flex h-full">
-      {/* Conversation List */}
-      <div className="w-80 border-r border-gray-200 bg-white">
-        <div className="border-b border-gray-200 p-4">
-          <h2 className="text-lg font-semibold">Inbox</h2>
+      {/* Sidebar - Conversation List */}
+      <div className="flex w-[340px] flex-col border-r border-gray-200 bg-white">
+        {/* Header */}
+        <div className="flex-shrink-0 border-b border-gray-100 px-4 pb-3 pt-4">
+          <h2 className="mb-3 text-lg font-bold text-gray-900">Chats</h2>
+          {/* Search */}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#06C755]/30"
+            />
+          </div>
+          {/* Filter tabs */}
+          <div className="mt-3 flex gap-1">
+            {(['all', 'open', 'resolved'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  filter === f
+                    ? 'bg-[#06C755] text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {f === 'all' ? 'All' : f === 'open' ? 'Open' : 'Resolved'}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="overflow-y-auto">
-          {conversations.map((conv) => (
-            <button
-              key={conv.id}
-              onClick={() => setActiveConversation(conv)}
-              className={`w-full border-b border-gray-100 p-4 text-left transition hover:bg-gray-50 ${
-                activeConversation?.id === conv.id ? 'bg-indigo-50' : ''
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                {/* Channel badge */}
-                <span
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${
-                    channelColors[conv.inbox.channelType] || 'bg-gray-400'
-                  }`}
-                >
-                  {channelLabels[conv.inbox.channelType] || '?'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="truncate font-medium">
-                      {conv.contact.name || 'Unknown'}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(conv.lastActivityAt).toLocaleTimeString(
-                        'th-TH',
-                        { hour: '2-digit', minute: '2-digit' },
-                      )}
-                    </span>
-                  </div>
-                  <p className="truncate text-sm text-gray-500">
-                    {conv.messages?.[0]?.content || 'No messages'}
-                  </p>
-                </div>
-              </div>
-            </button>
-          ))}
 
-          {conversations.length === 0 && (
-            <div className="p-8 text-center text-gray-400">
-              No conversations yet
+        {/* List */}
+        <div className="flex-1 overflow-y-auto">
+          {filteredConversations.map((conv) => (
+            <ConversationItem
+              key={conv.id}
+              conv={conv}
+              isActive={activeConversation?.id === conv.id}
+              onClick={() => setActiveConversation(conv)}
+            />
+          ))}
+          {filteredConversations.length === 0 && (
+            <div className="flex flex-col items-center justify-center p-8 text-center">
+              <svg className="mb-3 h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <p className="text-sm text-gray-400">No conversations</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Chat Area */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col bg-[#f5f5f0]">
         {activeConversation ? (
           <>
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
+            {/* Chat Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-white px-5 py-3 shadow-sm">
               <div className="flex items-center gap-3">
-                <span
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${
-                    channelColors[
-                      activeConversation.inbox.channelType
-                    ] || 'bg-gray-400'
-                  }`}
-                >
-                  {channelLabels[
-                    activeConversation.inbox.channelType
-                  ] || '?'}
-                </span>
+                {activeConversation.contact.avatarUrl ? (
+                  <img
+                    src={activeConversation.contact.avatarUrl}
+                    alt=""
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
+                    {getInitials(activeConversation.contact.name || '?')}
+                  </div>
+                )}
                 <div>
-                  <h3 className="font-semibold">
+                  <h3 className="text-sm font-bold text-gray-900">
                     {activeConversation.contact.name}
                   </h3>
-                  <span className="text-xs text-gray-400">
-                    {activeConversation.inbox.name} &middot;{' '}
-                    {activeConversation.status}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${
+                        channelColors[activeConversation.inbox.channelType] || 'bg-gray-400'
+                      }`}
+                    >
+                      {channelIcons[activeConversation.inbox.channelType]}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {activeConversation.inbox.name}
+                    </span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                        activeConversation.status === 'open'
+                          ? 'bg-green-100 text-green-700'
+                          : activeConversation.status === 'resolved'
+                            ? 'bg-gray-100 text-gray-500'
+                            : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {activeConversation.status}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    api.updateConversationStatus(
-                      activeConversation.id,
-                      'resolved',
-                    )
-                  }
-                  className="rounded-lg bg-green-100 px-3 py-1 text-sm text-green-700 hover:bg-green-200"
-                >
-                  Resolve
-                </button>
-              </div>
+              <button
+                onClick={async () => {
+                  await api.updateConversationStatus(activeConversation.id, 'resolved');
+                  fetchConversations();
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-100"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Resolve
+              </button>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-              <div className="space-y-4">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${
-                      msg.messageType === 'incoming'
-                        ? 'justify-start'
-                        : 'justify-end'
-                    }`}
-                  >
-                    <div
-                      className={`max-w-md rounded-2xl px-4 py-2 ${
-                        msg.messageType === 'incoming'
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : msg.senderType === 'Bot'
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-indigo-600 text-white'
-                      }`}
-                    >
-                      {msg.senderType === 'Bot' && (
-                        <div className="mb-1 text-xs opacity-75">
-                          AI Assistant
-                        </div>
-                      )}
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
-                      <div className="mt-1 text-xs opacity-60">
-                        {new Date(msg.createdAt).toLocaleTimeString(
-                          'th-TH',
-                          { hour: '2-digit', minute: '2-digit' },
-                        )}
-                      </div>
-                    </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {groupedMessages.map((group) => (
+                <div key={group.date}>
+                  {/* Date separator */}
+                  <div className="my-4 flex items-center justify-center">
+                    <span className="rounded-full bg-gray-200/80 px-3 py-1 text-[11px] font-medium text-gray-500">
+                      {group.date}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <div className="space-y-2">
+                    {group.msgs.map((msg, i) => (
+                      <ChatBubble
+                        key={msg.id}
+                        msg={msg}
+                        isLast={i === group.msgs.length - 1}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="border-t border-gray-200 bg-white p-4">
-              <div className="flex gap-2">
+            {/* Input Area */}
+            <div className="border-t border-gray-200 bg-white px-4 py-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={handleAiSuggest}
                   disabled={aiLoading}
-                  className="rounded-lg bg-purple-100 px-3 py-2 text-sm text-purple-700 hover:bg-purple-200 disabled:opacity-50"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-600 transition hover:bg-purple-200 disabled:opacity-50"
                   title="AI Suggest Reply"
                 >
-                  {aiLoading ? '...' : 'AI'}
+                  {aiLoading ? (
+                    <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    </svg>
+                  )}
                 </button>
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) =>
-                    e.key === 'Enter' && !e.shiftKey && handleSend()
-                  }
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                   placeholder="Type a message..."
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-[#06C755] focus:outline-none focus:ring-1 focus:ring-[#06C755]/30"
                 />
                 <button
                   onClick={handleSend}
-                  className="rounded-lg bg-indigo-600 px-6 py-2 text-white hover:bg-indigo-700"
+                  disabled={!input.trim()}
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#06C755] text-white transition hover:bg-[#05b34c] disabled:opacity-40"
                 >
-                  Send
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                  </svg>
                 </button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-gray-400">
-            Select a conversation to start
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
+              <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <h3 className="mb-1 text-lg font-semibold text-gray-700">Select a conversation</h3>
+            <p className="text-sm text-gray-400">Choose a chat from the left to start messaging</p>
           </div>
         )}
       </div>
