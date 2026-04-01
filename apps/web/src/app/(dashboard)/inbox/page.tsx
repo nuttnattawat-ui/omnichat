@@ -565,7 +565,7 @@ export default function InboxPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Sync contact form + fetch labels + reset read receipt
+  // Sync contact form + fetch labels + reset read receipt + auto refresh profile
   useEffect(() => {
     setReadAt(null);
     if (activeConversation) {
@@ -575,6 +575,16 @@ export default function InboxPage() {
         phone: (activeConversation.contact as any).phone || '',
       });
       api.getConversationLabels(activeConversation.id).then(setConvLabels).catch(() => {});
+
+      // Auto refresh profile if name is generic (e.g. "facebook user", "line user")
+      const nameLower = (activeConversation.contact.name || '').toLowerCase();
+      if (!activeConversation.contact.name || nameLower.endsWith(' user') || nameLower === 'unknown') {
+        api.refreshContactProfile(activeConversation.contact.id).then((result) => {
+          if (result.name && !result.error) {
+            fetchConversations();
+          }
+        }).catch(() => {});
+      }
     } else {
       setConvLabels([]);
     }

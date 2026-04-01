@@ -54,6 +54,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ loading: true });
     try {
       const conversations = await api.getConversations(filters);
+      conversations.sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
       set({ conversations });
     } finally {
       set({ loading: false });
@@ -144,6 +145,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
+      conversations.sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
       return { conversations, activeConversation };
     });
   },
