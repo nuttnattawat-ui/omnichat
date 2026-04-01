@@ -22,8 +22,11 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-16 flex-col items-center border-r border-gray-200 bg-white py-4">
       {/* Logo */}
-      <div className="mb-8 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
+      <div className="group relative mb-8 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
         OC
+        <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition group-hover:opacity-100">
+          OmniChat
+        </span>
       </div>
 
       {/* Nav */}
@@ -35,12 +38,11 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={clsx(
-                'flex h-10 w-10 items-center justify-center rounded-lg transition',
+                'group relative flex h-10 w-10 items-center justify-center rounded-lg transition',
                 isActive
                   ? 'bg-indigo-100 text-indigo-600'
                   : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
               )}
-              title={item.label}
             >
               <svg
                 className="h-5 w-5"
@@ -49,6 +51,9 @@ export function Sidebar() {
               >
                 <path d={icons[item.icon]} />
               </svg>
+              <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition group-hover:opacity-100">
+                {item.label}
+              </span>
             </Link>
           );
         })}

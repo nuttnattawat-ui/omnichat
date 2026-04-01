@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChatStore } from '@/stores/chat.store';
 import { connectSocket } from '@/lib/socket';
 import { api, Message, Conversation } from '@/lib/api';
@@ -264,7 +264,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
             ? 'rounded-2xl rounded-bl-md bg-white text-gray-900 shadow-sm ring-1 ring-gray-100'
             : isBot
               ? 'rounded-2xl rounded-br-md bg-purple-500 text-white'
-              : 'rounded-2xl rounded-br-md bg-[#06C755] text-white'
+              : 'rounded-2xl rounded-br-md bg-indigo-600 text-white'
         }`}
       >
         {isBot && (
@@ -310,9 +310,20 @@ const STICKER_PACKAGES = [
 function StickerPicker({ onSelect, onClose }: { onSelect: (packageId: string, stickerId: string) => void; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState(0);
   const pkg = STICKER_PACKAGES[activeTab];
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
 
   return (
-    <div className="absolute bottom-12 right-0 z-50 w-[320px] rounded-xl border border-gray-200 bg-white shadow-xl">
+    <div ref={panelRef} className="absolute bottom-12 right-0 z-50 w-[320px] rounded-xl border border-gray-200 bg-white shadow-xl">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
         <span className="text-xs font-semibold text-gray-600">Stickers</span>
@@ -510,8 +521,18 @@ export default function InboxPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
-              className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#06C755]/30"
+              className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-9 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#06C755]/30"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
           {/* Filter tabs */}
           <div className="mt-3 flex gap-1">
@@ -658,7 +679,7 @@ export default function InboxPage() {
                 <button
                   onClick={handleAiSuggest}
                   disabled={aiLoading}
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-600 transition hover:bg-purple-200 disabled:opacity-50"
+                  className="group relative flex h-10 flex-shrink-0 items-center gap-1.5 rounded-full bg-purple-100 px-3 text-purple-600 transition hover:bg-purple-200 disabled:opacity-50"
                   title="AI Suggest Reply"
                 >
                   {aiLoading ? (
@@ -667,9 +688,12 @@ export default function InboxPage() {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                   ) : (
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                    </svg>
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                      </svg>
+                      <span className="text-xs font-medium">AI</span>
+                    </>
                   )}
                 </button>
                 <input
@@ -678,13 +702,13 @@ export default function InboxPage() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                   placeholder="Type a message..."
-                  className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-[#06C755] focus:outline-none focus:ring-1 focus:ring-[#06C755]/30"
+                  className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
                 />
                 <div className="relative">
                   <button
                     onClick={() => setShowStickerPicker(!showStickerPicker)}
                     className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                    title="Send Sticker"
+                    title="LINE Stickers"
                   >
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -793,7 +817,7 @@ export default function InboxPage() {
                 type="email"
                 value={contactForm.email}
                 onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                placeholder="customer@email.com"
+                placeholder="Not provided"
                 className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
               />
             </div>
@@ -803,7 +827,7 @@ export default function InboxPage() {
                 type="tel"
                 value={contactForm.phone}
                 onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                placeholder="08X-XXX-XXXX"
+                placeholder="Not provided"
                 className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
               />
             </div>
