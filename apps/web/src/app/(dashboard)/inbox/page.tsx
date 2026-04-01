@@ -1221,25 +1221,15 @@ export default function InboxPage() {
             >
               {channelIcons[activeConversation.inbox.channelType]} {activeConversation.inbox.name}
             </span>
-            <button
-              onClick={async () => {
-                try {
-                  const result = await api.refreshContactProfile(activeConversation.contact.id);
-                  if (result.name && !result.error) {
-                    fetchConversations();
-                    alert(`Profile updated: ${result.name}`);
-                  } else {
-                    alert(result.error || 'Could not fetch profile');
-                  }
-                } catch (err) {
-                  alert('Failed to refresh: ' + (err instanceof Error ? err.message : String(err)));
-                }
-              }}
-              className="mt-1 text-[10px] text-indigo-500 hover:text-indigo-700 transition"
-              title="Refresh profile from platform"
-            >
-              Refresh Profile
-            </button>
+            {(() => {
+              const nameLower = (activeConversation.contact.name || '').toLowerCase();
+              const isGeneric = !activeConversation.contact.name || nameLower.endsWith(' user') || nameLower === 'unknown';
+              return isGeneric ? (
+                <span className="mt-1 text-[10px] text-amber-600">
+                  ชื่อไม่พร้อมใช้งาน — แก้ไขด้านล่าง
+                </span>
+              ) : null;
+            })()}
           </div>
 
           {/* Contact Info Form */}
