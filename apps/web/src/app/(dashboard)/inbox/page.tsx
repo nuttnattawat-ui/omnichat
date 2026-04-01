@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChatStore } from '@/stores/chat.store';
 import { connectSocket } from '@/lib/socket';
-import { api, Message, Conversation, TeamMember, CannedResponse } from '@/lib/api';
+import { api, Message, Conversation, TeamMember, CannedResponse, Label } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -426,9 +426,15 @@ export default function InboxPage() {
   const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
   const [showCannedMenu, setShowCannedMenu] = useState(false);
   const [cannedFilter, setCannedFilter] = useState('');
+  const [allLabels, setAllLabels] = useState<Label[]>([]);
+  const [convLabels, setConvLabels] = useState<{ id: number; label: Label }[]>([]);
+  const [showLabelPicker, setShowLabelPicker] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const notifAudioRef = useRef<HTMLAudioElement | null>(null);
   const assignDropdownRef = useRef<HTMLDivElement>(null);
+  const labelPickerRef = useRef<HTMLDivElement>(null);
 
   // Initialize notification sound
   useEffect(() => {
@@ -440,6 +446,7 @@ export default function InboxPage() {
     // Load team members and canned responses
     api.getTeam().then(setTeamMembers).catch(() => {});
     api.getCannedResponses().then(setCannedResponses).catch(() => {});
+    api.getLabels().then(setAllLabels).catch(() => {});
   }, []);
 
   const playNotificationSound = useCallback(() => {
@@ -504,18 +511,21 @@ export default function InboxPage() {
     };
   }, [activeConversation]);
 
-  // Close assign dropdown on click outside
+  // Close dropdowns on click outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (assignDropdownRef.current && !assignDropdownRef.current.contains(e.target as Node)) {
         setShowAssignDropdown(false);
+      }
+      if (labelPickerRef.current && !labelPickerRef.current.contains(e.target as Node)) {
+        setShowLabelPicker(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Sync contact form
+  // Sync contact form + fetch labels
   useEffect(() => {
     if (activeConversation) {
       setContactForm({
@@ -523,6 +533,9 @@ export default function InboxPage() {
         email: (activeConversation.contact as any).email || '',
         phone: (activeConversation.contact as any).phone || '',
       });
+      api.getConversationLabels(activeConversation.id).then(setConvLabels).catch(() => {});
+    } else {
+      setConvLabels([]);
     }
   }, [activeConversation]);
 
@@ -593,6 +606,18 @@ export default function InboxPage() {
     fetchConversations();
   };
 
+  const handleToggleLabel = async (label: Label) => {
+    if (!activeConversation) return;
+    const existing = convLabels.find((cl) => cl.label.id === label.id);
+    if (existing) {
+      await api.removeLabelFromConversation(activeConversation.id, label.id);
+      setConvLabels((prev) => prev.filter((cl) => cl.label.id !== label.id));
+    } else {
+      const created = await api.addLabelToConversation(activeConversation.id, label.id);
+      setConvLabels((prev) => [...prev, { id: (created as any).id, label }]);
+    }
+  };
+
   const handleCannedSelect = (response: CannedResponse) => {
     setInput(response.content);
     setShowCannedMenu(false);
@@ -614,6 +639,29 @@ export default function InboxPage() {
   const filteredCanned = cannedResponses.filter((cr) =>
     !cannedFilter || cr.shortCode.toLowerCase().includes(cannedFilter) || cr.content.toLowerCase().includes(cannedFilter)
   );
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeConversation) return;
+    setUploadingFile(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        await sendMessage(activeConversation.id, base64, false, {
+          contentType: 'image',
+          contentAttributes: { fileName: file.name, fileSize: file.size, mimeType: file.type },
+        });
+        setUploadingFile(false);
+      };
+      reader.onerror = () => setUploadingFile(false);
+      reader.readAsDataURL(file);
+    } catch {
+      setUploadingFile(false);
+    }
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  };
 
   const handleSendNote = async () => {
     if (!noteInput.trim() || !activeConversation) return;
@@ -765,10 +813,57 @@ export default function InboxPage() {
                     >
                       {activeConversation.status}
                     </span>
+                    {convLabels.map((cl) => (
+                      <span
+                        key={cl.label.id}
+                        className="rounded-full px-1.5 py-0.5 text-[10px] font-medium text-white"
+                        style={{ backgroundColor: cl.label.color }}
+                      >
+                        {cl.label.title}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {/* Label Picker */}
+                <div className="relative" ref={labelPickerRef}>
+                  <button
+                    onClick={() => setShowLabelPicker(!showLabelPicker)}
+                    className="flex items-center gap-1 rounded-lg bg-gray-50 px-2.5 py-1.5 text-sm text-gray-500 transition hover:bg-gray-100"
+                    title="Labels"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </button>
+                  {showLabelPicker && (
+                    <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                      {allLabels.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-gray-400">No labels. Create in Settings.</p>
+                      ) : (
+                        allLabels.map((label) => {
+                          const isActive = convLabels.some((cl) => cl.label.id === label.id);
+                          return (
+                            <button
+                              key={label.id}
+                              onClick={() => handleToggleLabel(label)}
+                              className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-50 ${isActive ? 'bg-gray-50' : ''}`}
+                            >
+                              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: label.color }} />
+                              <span className="flex-1 text-gray-700">{label.title}</span>
+                              {isActive && (
+                                <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
                 {/* Assign Agent Dropdown */}
                 <div className="relative" ref={assignDropdownRef}>
                   <button
@@ -922,6 +1017,31 @@ export default function InboxPage() {
                     </div>
                   )}
                 </div>
+                {/* File Upload */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingFile}
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                  title="Send Image"
+                >
+                  {uploadingFile ? (
+                    <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                  )}
+                </button>
                 {activeConversation?.inbox.channelType === 'line' && (
                   <div className="relative">
                     <button

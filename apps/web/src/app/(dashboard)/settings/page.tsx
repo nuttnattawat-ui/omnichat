@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, Inbox, UserProfile, TeamMember, CannedResponse } from '@/lib/api';
+import { api, Inbox, UserProfile, TeamMember, CannedResponse, Label } from '@/lib/api';
 
 type ChannelForm = {
   name: string;
@@ -39,7 +39,7 @@ const channelFields: Record<string, { key: string; label: string; placeholder: s
 };
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<'profile' | 'inboxes' | 'team' | 'canned'>('profile');
+  const [tab, setTab] = useState<'profile' | 'inboxes' | 'team' | 'canned' | 'labels'>('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [inboxes, setInboxes] = useState<Inbox[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -48,6 +48,15 @@ export default function SettingsPage() {
   const [newCannedCode, setNewCannedCode] = useState('');
   const [newCannedContent, setNewCannedContent] = useState('');
   const [cannedSaving, setCannedSaving] = useState(false);
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [newLabelTitle, setNewLabelTitle] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#6366f1');
+  const [labelSaving, setLabelSaving] = useState(false);
+  const [inviteName, setInviteName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('agent');
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ email: string; tempPassword: string } | null>(null);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -64,6 +73,7 @@ export default function SettingsPage() {
     api.getInboxes().then(setInboxes);
     api.getTeam().then(setTeam);
     api.getCannedResponses().then(setCannedResponses).catch(() => {});
+    api.getLabels().then(setLabels).catch(() => {});
   }, []);
 
   const openAddModal = () => {
@@ -179,11 +189,57 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAddLabel = async () => {
+    if (!newLabelTitle.trim()) return;
+    setLabelSaving(true);
+    try {
+      const created = await api.createLabel({ title: newLabelTitle.trim(), color: newLabelColor });
+      setLabels((prev) => [...prev, created]);
+      setNewLabelTitle('');
+      setNewLabelColor('#6366f1');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create label');
+    } finally {
+      setLabelSaving(false);
+    }
+  };
+
+  const handleDeleteLabel = async (id: number) => {
+    try {
+      await api.deleteLabel(id);
+      setLabels((prev) => prev.filter((l) => l.id !== id));
+    } catch {
+      alert('Failed to delete');
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteName.trim() || !inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteResult(null);
+    try {
+      const result = await api.inviteTeamMember({
+        name: inviteName.trim(),
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+      setInviteResult({ email: result.email, tempPassword: result.tempPassword });
+      setTeam((prev) => [...prev, result]);
+      setInviteName('');
+      setInviteEmail('');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to invite');
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const tabs = [
     { key: 'profile' as const, label: 'Profile' },
     { key: 'inboxes' as const, label: 'Channels' },
     { key: 'team' as const, label: 'Team' },
     { key: 'canned' as const, label: 'Quick Replies' },
+    { key: 'labels' as const, label: 'Labels' },
   ];
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -344,6 +400,50 @@ export default function SettingsPage() {
               <p className="text-gray-500">Manage your team members</p>
             </div>
 
+            {/* Invite Form */}
+            <div className="flex gap-3 rounded-xl border border-gray-200 p-4">
+              <input
+                type="text"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                placeholder="Name"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+              />
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Email"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+              />
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="agent">Agent</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button
+                onClick={handleInvite}
+                disabled={inviting || !inviteName.trim() || !inviteEmail.trim()}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {inviting ? 'Inviting...' : 'Invite'}
+              </button>
+            </div>
+
+            {inviteResult && (
+              <div className="rounded-lg bg-green-50 p-4 text-sm">
+                <p className="font-medium text-green-800">Team member invited!</p>
+                <p className="mt-1 text-green-700">
+                  Email: <strong>{inviteResult.email}</strong><br />
+                  Temporary password: <code className="rounded bg-green-100 px-1.5 py-0.5 font-mono text-xs">{inviteResult.tempPassword}</code>
+                </p>
+                <p className="mt-2 text-xs text-green-600">Share these credentials with the team member so they can log in.</p>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 text-left text-sm text-gray-500">
@@ -445,6 +545,69 @@ export default function SettingsPage() {
               {cannedResponses.length === 0 && (
                 <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center text-gray-400">
                   No quick replies yet. Add your first one above.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Labels Tab */}
+        {tab === 'labels' && (
+          <div className="max-w-lg space-y-4">
+            <p className="text-gray-500">
+              Create labels to categorize and organize conversations.
+            </p>
+
+            {/* Add New Label */}
+            <div className="flex items-center gap-3 rounded-xl border border-gray-200 p-4">
+              <input
+                type="color"
+                value={newLabelColor}
+                onChange={(e) => setNewLabelColor(e.target.value)}
+                className="h-9 w-9 cursor-pointer rounded border-0 p-0"
+              />
+              <input
+                type="text"
+                value={newLabelTitle}
+                onChange={(e) => setNewLabelTitle(e.target.value)}
+                placeholder="Label name (e.g. VIP, Urgent, Sales)"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
+              />
+              <button
+                onClick={handleAddLabel}
+                disabled={labelSaving || !newLabelTitle.trim()}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {labelSaving ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+
+            {/* Label List */}
+            <div className="space-y-2">
+              {labels.map((label) => (
+                <div
+                  key={label.id}
+                  className="flex items-center justify-between rounded-xl border border-gray-100 p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="h-4 w-4 rounded-full"
+                      style={{ backgroundColor: label.color }}
+                    />
+                    <span className="text-sm font-medium text-gray-700">{label.title}</span>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteLabel(label.id)}
+                    className="text-sm text-red-500 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+              {labels.length === 0 && (
+                <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center text-gray-400">
+                  No labels yet. Add your first one above.
                 </div>
               )}
             </div>

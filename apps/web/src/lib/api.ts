@@ -234,6 +234,48 @@ class ApiClient {
   deleteCannedResponse(id: number) {
     return this.request(`/canned-responses/${id}`, { method: 'DELETE' });
   }
+
+  // Labels
+  getLabels() {
+    return this.request<Label[]>('/labels');
+  }
+
+  createLabel(data: { title: string; color?: string }) {
+    return this.request<Label>('/labels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  deleteLabel(id: number) {
+    return this.request(`/labels/${id}`, { method: 'DELETE' });
+  }
+
+  getConversationLabels(conversationId: number) {
+    return this.request<{ id: number; label: Label }[]>(
+      `/labels/conversations/${conversationId}`,
+    );
+  }
+
+  addLabelToConversation(conversationId: number, labelId: number) {
+    return this.request(`/labels/conversations/${conversationId}/${labelId}`, {
+      method: 'POST',
+    });
+  }
+
+  removeLabelFromConversation(conversationId: number, labelId: number) {
+    return this.request(`/labels/conversations/${conversationId}/${labelId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Invite Team Member
+  inviteTeamMember(data: { name: string; email: string; role?: string }) {
+    return this.request<TeamMember & { tempPassword: string }>('/settings/team/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new ApiClient();
@@ -347,4 +389,10 @@ export interface CannedResponse {
   shortCode: string;
   content: string;
   createdAt: string;
+}
+
+export interface Label {
+  id: number;
+  title: string;
+  color: string;
 }

@@ -1,13 +1,16 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Body,
   UseGuards,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 
 @Controller('settings')
 @UseGuards(JwtAuthGuard)
@@ -57,5 +60,47 @@ export class SettingsController {
         avatarUrl: true,
       },
     });
+  }
+
+  /** Invite a new team member */
+  @Post('team/invite')
+  async inviteTeamMember(
+    @Req() req: { user: { accountId: number } },
+    @Body() body: { name: string; email: string; role?: string },
+  ) {
+    if (!body.name?.trim() || !body.email?.trim()) {
+      throw new BadRequestException('Name and email are required');
+    }
+
+    // Check if email already exists
+    const existing = await this.prisma.user.findUnique({
+      where: { email: body.email },
+    });
+    if (existing) {
+      throw new BadRequestException('A user with this email already exists');
+    }
+
+    // Create user with temporary password
+    const tempPassword = Math.random().toString(36).slice(-8) + 'A1!';
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+    const user = await this.prisma.user.create({
+      data: {
+        accountId: req.user.accountId,
+        email: body.email.trim(),
+        name: body.name.trim(),
+        password: hashedPassword,
+        role: body.role || 'agent',
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+      },
+    });
+
+    return { ...user, tempPassword };
   }
 }

@@ -15,6 +15,7 @@ import { MediaModule } from './modules/media/media.module';
 import { HealthModule } from './modules/health/health.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CannedResponsesModule } from './modules/canned-responses/canned-responses.module';
+import { LabelsModule } from './modules/labels/labels.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CannedResponsesModule } from './modules/canned-responses/canned-respons
     MediaModule,
     ReportsModule,
     CannedResponsesModule,
+    LabelsModule,
   ],
 })
 export class AppModule {}

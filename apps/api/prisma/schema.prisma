@@ -23,6 +23,7 @@ model Account {
   conversations    Conversation[]
   messages         Message[]
   cannedResponses  CannedResponse[]
+  labels           Label[]
 
   @@map("accounts")
 }
@@ -135,6 +136,7 @@ model Conversation {
   contact  Contact  @relation(fields: [contactId], references: [id])
   assignee User?    @relation("assignee", fields: [assigneeId], references: [id])
   messages Message[]
+  labels   ConversationLabel[]
 
   @@index([accountId, status, lastActivityAt(sort: Desc)])
   @@map("conversations")
@@ -183,4 +185,34 @@ model CannedResponse {
 
   @@unique([accountId, shortCode])
   @@map("canned_responses")
+}
+
+// =============================================
+// Labels (Tags for Conversations)
+// =============================================
+model Label {
+  id        Int      @id @default(autoincrement())
+  accountId Int      @map("account_id")
+  title     String
+  color     String   @default("#6366f1") // hex color
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account       Account             @relation(fields: [accountId], references: [id])
+  conversations ConversationLabel[]
+
+  @@unique([accountId, title])
+  @@map("labels")
+}
+
+model ConversationLabel {
+  id             Int      @id @default(autoincrement())
+  conversationId Int      @map("conversation_id")
+  labelId        Int      @map("label_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  label        Label        @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, labelId])
+  @@map("conversation_labels")
 }
