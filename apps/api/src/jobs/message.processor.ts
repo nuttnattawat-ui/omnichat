@@ -223,7 +223,8 @@ export class MessageProcessor {
           rawPayload: undefined,
         })),
         sourceId: msg.platformMessageId,
-        senderId: contactInbox.contactId,
+        // senderId FK points to User table, so leave null for Contact messages
+        // Contact identity is tracked via conversation.contactId
         senderType: 'Contact',
       },
     });
