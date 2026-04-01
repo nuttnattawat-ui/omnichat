@@ -437,7 +437,7 @@ export default function InboxPage() {
   const labelPickerRef = useRef<HTMLDivElement>(null);
 
   // Initialize notification sound + data
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const notifAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     // Load team members, canned responses, labels
@@ -445,51 +445,57 @@ export default function InboxPage() {
     api.getCannedResponses().then(setCannedResponses).catch(() => {});
     api.getLabels().then(setAllLabels).catch(() => {});
 
-    // Resume AudioContext on first user interaction (browser policy)
-    const resumeAudio = () => {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-    };
-    document.addEventListener('click', resumeAudio, { once: false });
-    document.addEventListener('keydown', resumeAudio, { once: false });
+    // Generate a small WAV notification beep and preload it
+    try {
+      const sampleRate = 8000;
+      const duration = 0.3;
+      const numSamples = Math.floor(sampleRate * duration);
+      const buffer = new ArrayBuffer(44 + numSamples * 2);
+      const view = new DataView(buffer);
 
-    return () => {
-      document.removeEventListener('click', resumeAudio);
-      document.removeEventListener('keydown', resumeAudio);
-    };
+      // WAV header
+      const writeStr = (offset: number, str: string) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + numSamples * 2, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, 'data');
+      view.setUint32(40, numSamples * 2, true);
+
+      // Generate two-tone beep
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const freq = t < 0.15 ? 880 : 1100;
+        const envelope = Math.max(0, 1 - t / duration);
+        const sample = Math.sin(2 * Math.PI * freq * t) * envelope * 0.4;
+        view.setInt16(44 + i * 2, Math.floor(sample * 32767), true);
+      }
+
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.volume = 0.6;
+      notifAudioRef.current = audio;
+    } catch {
+      // Audio generation failed
+    }
   }, []);
 
   const playNotificationSound = useCallback(() => {
     try {
-      if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (notifAudioRef.current) {
+        notifAudioRef.current.currentTime = 0;
+        notifAudioRef.current.play().catch(() => {});
       }
-      const ctx = audioCtxRef.current;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-      // Double beep: do-di
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc1.connect(gain);
-      osc2.connect(gain);
-      gain.connect(ctx.destination);
-
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-
-      osc1.frequency.setValueAtTime(880, ctx.currentTime); // A5
-      osc1.start(ctx.currentTime);
-      osc1.stop(ctx.currentTime + 0.15);
-
-      osc2.frequency.setValueAtTime(1100, ctx.currentTime + 0.18); // C#6
-      osc2.start(ctx.currentTime + 0.18);
-      osc2.stop(ctx.currentTime + 0.35);
     } catch {
       // Audio not available
     }
@@ -1181,6 +1187,25 @@ export default function InboxPage() {
             >
               {channelIcons[activeConversation.inbox.channelType]} {activeConversation.inbox.name}
             </span>
+            <button
+              onClick={async () => {
+                try {
+                  const result = await api.refreshContactProfile(activeConversation.contact.id);
+                  if (result.name && !result.error) {
+                    fetchConversations();
+                    alert(`Profile updated: ${result.name}`);
+                  } else {
+                    alert(result.error || 'Could not fetch profile');
+                  }
+                } catch {
+                  alert('Failed to refresh');
+                }
+              }}
+              className="mt-1 text-[10px] text-indigo-500 hover:text-indigo-700 transition"
+              title="Refresh profile from platform"
+            >
+              Refresh Profile
+            </button>
           </div>
 
           {/* Contact Info Form */}

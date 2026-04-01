@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Param,
   Body,
@@ -8,14 +9,25 @@ import {
   ParseIntPipe,
   UseGuards,
   Req,
+  Logger,
 } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { LineAdapter } from '../../adapters/line.adapter';
+import { FacebookAdapter } from '../../adapters/facebook.adapter';
 
 @Controller('contacts')
 @UseGuards(JwtAuthGuard)
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  private readonly logger = new Logger(ContactsController.name);
+
+  constructor(
+    private readonly contactsService: ContactsService,
+    private readonly prisma: PrismaService,
+    private readonly lineAdapter: LineAdapter,
+    private readonly facebookAdapter: FacebookAdapter,
+  ) {}
 
   @Get()
   findAll(
@@ -45,5 +57,49 @@ export class ContactsController {
     @Body() body: { name?: string; email?: string; phone?: string },
   ) {
     return this.contactsService.update(id, req.user.accountId, body);
+  }
+
+  /** Re-fetch profile from platform API */
+  @Post(':id/refresh')
+  async refreshProfile(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: { accountId: number } },
+  ) {
+    const contact = await this.prisma.contact.findFirst({
+      where: { id, accountId: req.user.accountId },
+      include: {
+        contactInboxes: { include: { inbox: true } },
+      },
+    });
+
+    if (!contact) return { error: 'Contact not found' };
+
+    for (const ci of contact.contactInboxes) {
+      const config = ci.inbox.channelConfig as Record<string, string>;
+      try {
+        if (ci.inbox.channelType === 'line') {
+          const profile = await this.lineAdapter.getUserProfile(config.channelAccessToken, ci.sourceId);
+          await this.prisma.contact.update({
+            where: { id },
+            data: { name: profile.displayName, avatarUrl: profile.pictureUrl },
+          });
+          this.logger.log(`Refreshed LINE profile for contact ${id}: ${profile.displayName}`);
+          return { name: profile.displayName, avatarUrl: profile.pictureUrl };
+        } else if (ci.inbox.channelType === 'facebook' || ci.inbox.channelType === 'instagram') {
+          const profile = await this.facebookAdapter.getUserProfile(config.pageAccessToken, ci.sourceId);
+          await this.prisma.contact.update({
+            where: { id },
+            data: { name: profile.name, avatarUrl: profile.profilePic },
+          });
+          this.logger.log(`Refreshed ${ci.inbox.channelType} profile for contact ${id}: ${profile.name}`);
+          return { name: profile.name, avatarUrl: profile.profilePic };
+        }
+      } catch (err) {
+        this.logger.error(`Failed to refresh profile for contact ${id}: ${err}`);
+        return { error: `Failed to fetch profile: ${err}` };
+      }
+    }
+
+    return { error: 'No channel inbox found' };
   }
 }

@@ -144,6 +144,13 @@ class ApiClient {
     });
   }
 
+  refreshContactProfile(id: number) {
+    return this.request<{ name?: string; avatarUrl?: string; error?: string }>(
+      `/contacts/${id}/refresh`,
+      { method: 'POST' },
+    );
+  }
+
   // Inboxes
   getInboxes() {
     return this.request<Inbox[]>('/inboxes');
