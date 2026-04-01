@@ -75,11 +75,13 @@ export class ContactsController {
 
       if (!contact) return { error: 'Contact not found' };
 
-      this.logger.log(`Refreshing profile for contact ${id}, inboxes: ${contact.contactInboxes.length}`);
+      this.logger.log(`Refreshing profile for contact ${id}, name="${contact.name}", inboxes: ${contact.contactInboxes.length}`);
 
       for (const ci of contact.contactInboxes) {
         const config = ci.inbox.channelConfig as Record<string, string>;
-        this.logger.log(`Trying inbox ${ci.inbox.id} (${ci.inbox.channelType}), sourceId=${ci.sourceId}, hasToken=${!!(config.pageAccessToken || config.channelAccessToken)}`);
+        const tokenKey = ci.inbox.channelType === 'line' ? 'channelAccessToken' : 'pageAccessToken';
+        const token = config[tokenKey];
+        this.logger.log(`Trying inbox ${ci.inbox.id} (${ci.inbox.channelType}), sourceId="${ci.sourceId}", tokenKey=${tokenKey}, tokenLength=${token?.length || 0}`);
         try {
           if (ci.inbox.channelType === 'line') {
             const profile = await this.lineAdapter.getUserProfile(config.channelAccessToken, ci.sourceId);

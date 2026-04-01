@@ -40,6 +40,7 @@ export class WebhooksService {
     body: Record<string, unknown>,
     _signature: string,
   ) {
+    this.logger.log(`Facebook webhook raw: ${JSON.stringify(body).substring(0, 1000)}`);
     const messages = this.facebookAdapter.parseWebhook(body);
     this.logger.log(`Parsed ${messages.length} Facebook messages`);
 

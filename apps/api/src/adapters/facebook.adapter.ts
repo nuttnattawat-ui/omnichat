@@ -109,9 +109,11 @@ export class FacebookAdapter implements ChannelAdapter {
     pageAccessToken: string,
     userId: string,
   ): Promise<{ name: string; profilePic?: string }> {
-    this.logger.log(`Fetching FB profile for ${userId}`);
+    this.logger.log(`Fetching FB profile for ${userId}, token length=${pageAccessToken?.length || 0}`);
+
+    // Try with name field as well (some API versions support it)
     const response = await fetch(
-      `https://graph.facebook.com/v19.0/${userId}?fields=first_name,last_name,profile_pic&access_token=${pageAccessToken}`,
+      `https://graph.facebook.com/v21.0/${userId}?fields=first_name,last_name,name,profile_pic&access_token=${pageAccessToken}`,
     );
 
     if (!response.ok) {
@@ -120,10 +122,22 @@ export class FacebookAdapter implements ChannelAdapter {
       throw new Error(`Facebook Profile API ${response.status}: ${error}`);
     }
 
-    const data = await response.json() as { first_name?: string; last_name?: string; name?: string; profile_pic?: string };
-    const displayName = [data.first_name, data.last_name].filter(Boolean).join(' ') || data.name || 'Facebook User';
-    this.logger.log(`FB profile: name=${displayName}, pic=${!!data.profile_pic}`);
-    return { name: displayName, profilePic: data.profile_pic };
+    const data = await response.json() as Record<string, unknown>;
+    this.logger.log(`FB profile raw response for ${userId}: ${JSON.stringify(data)}`);
+
+    const firstName = data.first_name as string | undefined;
+    const lastName = data.last_name as string | undefined;
+    const name = data.name as string | undefined;
+    const profilePic = data.profile_pic as string | undefined;
+
+    const displayName = [firstName, lastName].filter(Boolean).join(' ') || name || '';
+    this.logger.log(`FB profile resolved: displayName="${displayName}", pic=${!!profilePic}`);
+
+    if (!displayName) {
+      throw new Error(`Facebook returned empty profile for ${userId}: ${JSON.stringify(data)}`);
+    }
+
+    return { name: displayName, profilePic };
   }
 
   async sendMessage(
