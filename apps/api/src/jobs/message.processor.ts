@@ -157,17 +157,36 @@ export class MessageProcessor {
     // 5. Resolve content for non-text messages
     let messageContent = msg.content;
     this.logger.log(
-      `Message type=${msg.contentType}, content="${messageContent?.substring(0, 50)}", attrs=${JSON.stringify(msg.contentAttributes ?? {}).substring(0, 200)}`,
+      `Message type=${msg.contentType}, content="${messageContent?.substring(0, 50) || '(empty)'}", attrs=${JSON.stringify(msg.contentAttributes ?? {}).substring(0, 200)}`,
     );
 
+    // Download LINE image/video content immediately and store as data URL
     if (
       msg.channel === 'line' &&
-      ['image', 'video', 'audio'].includes(msg.contentType) &&
+      ['image'].includes(msg.contentType) &&
       !messageContent
     ) {
-      // Store proxy URL so frontend can load the image through our API
+      try {
+        const channelConfig = inbox.channelConfig as Record<string, string>;
+        const token = channelConfig.channelAccessToken;
+        this.logger.log(`Downloading LINE image: messageId=${msg.platformMessageId}`);
+        const { buffer, contentType } = await this.lineAdapter.getMessageContent(
+          token,
+          msg.platformMessageId,
+        );
+        messageContent = `data:${contentType};base64,${buffer.toString('base64')}`;
+        this.logger.log(`LINE image downloaded: ${buffer.length} bytes, type=${contentType}`);
+      } catch (err) {
+        this.logger.error(`Failed to download LINE image: ${err}`);
+        // Fallback to proxy URL
+        messageContent = `/api/media/line/${msg.platformMessageId}`;
+      }
+    } else if (
+      msg.channel === 'line' &&
+      ['video', 'audio'].includes(msg.contentType) &&
+      !messageContent
+    ) {
       messageContent = `/api/media/line/${msg.platformMessageId}`;
-      this.logger.log(`LINE media: proxy URL ${messageContent}`);
     }
 
     // 5. Save message
