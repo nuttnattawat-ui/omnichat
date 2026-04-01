@@ -59,6 +59,49 @@ export class ContactsController {
     return this.contactsService.update(id, req.user.accountId, body);
   }
 
+  /** Batch re-fetch profiles for all contacts with generic names */
+  @Post('refresh-all')
+  async refreshAllProfiles(
+    @Req() req: { user: { accountId: number } },
+  ) {
+    const contacts = await this.prisma.contact.findMany({
+      where: { accountId: req.user.accountId },
+      include: {
+        contactInboxes: { include: { inbox: true } },
+      },
+    });
+
+    const results: { id: number; name: string; status: string }[] = [];
+
+    for (const contact of contacts) {
+      const nameLower = (contact.name || '').toLowerCase();
+      const isGeneric = !contact.name || nameLower.endsWith(' user') || nameLower === 'unknown';
+      if (!isGeneric) {
+        results.push({ id: contact.id, name: contact.name || '', status: 'ok' });
+        continue;
+      }
+
+      for (const ci of contact.contactInboxes) {
+        const config = ci.inbox.channelConfig as Record<string, string>;
+        try {
+          if (ci.inbox.channelType === 'line') {
+            const profile = await this.lineAdapter.getUserProfile(config.channelAccessToken, ci.sourceId);
+            await this.prisma.contact.update({ where: { id: contact.id }, data: { name: profile.displayName, avatarUrl: profile.pictureUrl } });
+            results.push({ id: contact.id, name: profile.displayName, status: 'updated' });
+          } else if (ci.inbox.channelType === 'facebook' || ci.inbox.channelType === 'instagram') {
+            const profile = await this.facebookAdapter.getUserProfile(config.pageAccessToken, ci.sourceId);
+            await this.prisma.contact.update({ where: { id: contact.id }, data: { name: profile.name, avatarUrl: profile.profilePic } });
+            results.push({ id: contact.id, name: profile.name, status: 'updated' });
+          }
+        } catch (err) {
+          results.push({ id: contact.id, name: contact.name || '', status: `failed: ${err instanceof Error ? err.message : String(err)}` });
+        }
+      }
+    }
+
+    return results;
+  }
+
   /** Re-fetch profile from platform API */
   @Post(':id/refresh')
   async refreshProfile(

@@ -74,7 +74,25 @@ export default function ContactsPage() {
       {/* Contact List */}
       <div className="flex w-[380px] flex-col border-r border-gray-200">
         <div className="flex-shrink-0 border-b border-gray-100 p-4">
-          <h2 className="mb-3 text-lg font-bold text-gray-900">Contacts</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gray-900">Contacts</h2>
+            <button
+              onClick={async () => {
+                try {
+                  const results = await api.refreshAllProfiles();
+                  const updated = results.filter(r => r.status === 'updated').length;
+                  const failed = results.filter(r => r.status.startsWith('failed')).length;
+                  alert(`Updated: ${updated}, Failed: ${failed}, OK: ${results.length - updated - failed}`);
+                  api.getContacts().then(setContacts);
+                } catch {
+                  alert('Failed to refresh profiles');
+                }
+              }}
+              className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition"
+            >
+              Refresh All Profiles
+            </button>
+          </div>
           <div className="relative">
             <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

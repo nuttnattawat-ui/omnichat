@@ -151,6 +151,13 @@ class ApiClient {
     );
   }
 
+  refreshAllProfiles() {
+    return this.request<{ id: number; name: string; status: string }[]>(
+      '/contacts/refresh-all',
+      { method: 'POST' },
+    );
+  }
+
   // Inboxes
   getInboxes() {
     return this.request<Inbox[]>('/inboxes');
