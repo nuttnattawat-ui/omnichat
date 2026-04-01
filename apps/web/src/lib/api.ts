@@ -190,6 +190,50 @@ class ApiClient {
       { method: 'POST' },
     );
   }
+
+  // Reports
+  getReportsOverview() {
+    return this.request<ReportsOverview>('/reports/overview');
+  }
+
+  getConversationsByDay(days = 30) {
+    return this.request<DayData[]>(`/reports/conversations-by-day?days=${days}`);
+  }
+
+  getMessagesByDay(days = 30) {
+    return this.request<MessageDayData[]>(`/reports/messages-by-day?days=${days}`);
+  }
+
+  getReportsByChannel() {
+    return this.request<ChannelData[]>('/reports/by-channel');
+  }
+
+  getAgentPerformance() {
+    return this.request<AgentPerformance[]>('/reports/agent-performance');
+  }
+
+  // Canned Responses
+  getCannedResponses() {
+    return this.request<CannedResponse[]>('/canned-responses');
+  }
+
+  createCannedResponse(data: { shortCode: string; content: string }) {
+    return this.request<CannedResponse>('/canned-responses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  updateCannedResponse(id: number, data: { shortCode?: string; content?: string }) {
+    return this.request(`/canned-responses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  deleteCannedResponse(id: number) {
+    return this.request(`/canned-responses/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const api = new ApiClient();
@@ -256,4 +300,51 @@ export interface TeamMember {
   email: string;
   role: string;
   isActive: boolean;
+}
+
+export interface ReportsOverview {
+  totalConversations: number;
+  openConversations: number;
+  resolvedConversations: number;
+  totalMessages: number;
+  totalContacts: number;
+  avgMessages: number;
+  resolutionRate: number;
+}
+
+export interface DayData {
+  date: string;
+  total: number;
+  resolved: number;
+}
+
+export interface MessageDayData {
+  date: string;
+  incoming: number;
+  outgoing: number;
+}
+
+export interface ChannelData {
+  inboxId: number;
+  name: string;
+  channelType: string;
+  conversations: number;
+  messages: number;
+}
+
+export interface AgentPerformance {
+  id: number;
+  name: string;
+  role: string;
+  avatarUrl?: string;
+  assigned: number;
+  resolved: number;
+  messagesSent: number;
+}
+
+export interface CannedResponse {
+  id: number;
+  shortCode: string;
+  content: string;
+  createdAt: string;
 }

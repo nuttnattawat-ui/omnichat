@@ -13,6 +13,8 @@ import { ChatGatewayModule } from './gateway/chat-gateway.module';
 import { AiModule } from './modules/ai/ai.module';
 import { MediaModule } from './modules/media/media.module';
 import { HealthModule } from './modules/health/health.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { CannedResponsesModule } from './modules/canned-responses/canned-responses.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { HealthModule } from './modules/health/health.module';
     ChatGatewayModule,
     AiModule,
     MediaModule,
+    ReportsModule,
+    CannedResponsesModule,
   ],
 })
 export class AppModule {}

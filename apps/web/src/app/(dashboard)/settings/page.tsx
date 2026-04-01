@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, Inbox, UserProfile, TeamMember } from '@/lib/api';
+import { api, Inbox, UserProfile, TeamMember, CannedResponse } from '@/lib/api';
 
 type ChannelForm = {
   name: string;
@@ -39,11 +39,15 @@ const channelFields: Record<string, { key: string; label: string; placeholder: s
 };
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<'profile' | 'inboxes' | 'team'>('profile');
+  const [tab, setTab] = useState<'profile' | 'inboxes' | 'team' | 'canned'>('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [inboxes, setInboxes] = useState<Inbox[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [profileName, setProfileName] = useState('');
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
+  const [newCannedCode, setNewCannedCode] = useState('');
+  const [newCannedContent, setNewCannedContent] = useState('');
+  const [cannedSaving, setCannedSaving] = useState(false);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -59,6 +63,7 @@ export default function SettingsPage() {
     api.getProfile().then((p) => { setProfile(p); setProfileName(p.name); });
     api.getInboxes().then(setInboxes);
     api.getTeam().then(setTeam);
+    api.getCannedResponses().then(setCannedResponses).catch(() => {});
   }, []);
 
   const openAddModal = () => {
@@ -147,10 +152,38 @@ export default function SettingsPage() {
     setForm((f) => ({ ...f, channelConfig: { ...f.channelConfig, [key]: value } }));
   };
 
+  const handleAddCanned = async () => {
+    if (!newCannedCode.trim() || !newCannedContent.trim()) return;
+    setCannedSaving(true);
+    try {
+      const created = await api.createCannedResponse({
+        shortCode: newCannedCode.trim().replace(/^\//, ''),
+        content: newCannedContent.trim(),
+      });
+      setCannedResponses((prev) => [...prev, created]);
+      setNewCannedCode('');
+      setNewCannedContent('');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create');
+    } finally {
+      setCannedSaving(false);
+    }
+  };
+
+  const handleDeleteCanned = async (id: number) => {
+    try {
+      await api.deleteCannedResponse(id);
+      setCannedResponses((prev) => prev.filter((cr) => cr.id !== id));
+    } catch {
+      alert('Failed to delete');
+    }
+  };
+
   const tabs = [
     { key: 'profile' as const, label: 'Profile' },
     { key: 'inboxes' as const, label: 'Channels' },
     { key: 'team' as const, label: 'Team' },
+    { key: 'canned' as const, label: 'Quick Replies' },
   ];
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -350,6 +383,70 @@ export default function SettingsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Canned Responses Tab */}
+        {tab === 'canned' && (
+          <div className="max-w-2xl space-y-4">
+            <p className="text-gray-500">
+              Create quick reply templates. Type &quot;/&quot; in the chat input to use them.
+            </p>
+
+            {/* Add New */}
+            <div className="flex gap-3 rounded-xl border border-gray-200 p-4">
+              <div className="flex-1 space-y-2">
+                <input
+                  type="text"
+                  value={newCannedCode}
+                  onChange={(e) => setNewCannedCode(e.target.value)}
+                  placeholder="Shortcode (e.g. greeting)"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                />
+                <textarea
+                  value={newCannedContent}
+                  onChange={(e) => setNewCannedContent(e.target.value)}
+                  placeholder="Reply content..."
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+              <button
+                onClick={handleAddCanned}
+                disabled={cannedSaving || !newCannedCode.trim() || !newCannedContent.trim()}
+                className="self-end rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {cannedSaving ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="space-y-2">
+              {cannedResponses.map((cr) => (
+                <div
+                  key={cr.id}
+                  className="flex items-start justify-between rounded-xl border border-gray-100 p-4"
+                >
+                  <div>
+                    <span className="rounded bg-indigo-100 px-2 py-0.5 font-mono text-xs font-medium text-indigo-700">
+                      /{cr.shortCode}
+                    </span>
+                    <p className="mt-1 text-sm text-gray-600">{cr.content}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteCanned(cr.id)}
+                    className="ml-4 flex-shrink-0 text-sm text-red-500 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+              {cannedResponses.length === 0 && (
+                <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center text-gray-400">
+                  No quick replies yet. Add your first one above.
+                </div>
+              )}
             </div>
           </div>
         )}

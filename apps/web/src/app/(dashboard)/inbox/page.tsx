@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChatStore } from '@/stores/chat.store';
 import { connectSocket } from '@/lib/socket';
-import { api, Message, Conversation } from '@/lib/api';
+import { api, Message, Conversation, TeamMember, CannedResponse } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -202,8 +202,27 @@ function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
 function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boolean; onImageClick?: (url: string) => void }) {
   const isIncoming = msg.messageType === 'incoming';
   const isBot = msg.senderType === 'Bot';
+  const isPrivate = msg.private === true;
   const isSticker = msg.contentType === 'sticker';
   const isImage = msg.contentType === 'image';
+
+  // Private note — yellow bubble, always right-aligned
+  if (isPrivate) {
+    return (
+      <div className="flex items-end gap-2 justify-end">
+        <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>
+        <div className="relative max-w-[70%] rounded-2xl rounded-br-md bg-yellow-100 px-4 py-2.5 text-gray-800 ring-1 ring-yellow-200">
+          <div className="mb-0.5 flex items-center gap-1 text-[10px] font-medium text-yellow-700">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            Private Note
+          </div>
+          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
+        </div>
+      </div>
+    );
+  }
 
   // Sticker - no bubble background
   if (isSticker) {
@@ -400,7 +419,46 @@ export default function InboxPage() {
   const [savingContact, setSavingContact] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [noteInput, setNoteInput] = useState('');
+  const [sendingNote, setSendingNote] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([]);
+  const [showCannedMenu, setShowCannedMenu] = useState(false);
+  const [cannedFilter, setCannedFilter] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const notifAudioRef = useRef<HTMLAudioElement | null>(null);
+  const assignDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Initialize notification sound
+  useEffect(() => {
+    // Create audio element for notification sound (Web Audio API beep)
+    const audioCtx = typeof window !== 'undefined' ? new (window.AudioContext || (window as any).webkitAudioContext)() : null;
+    if (audioCtx) {
+      notifAudioRef.current = null; // We'll use Web Audio API directly
+    }
+    // Load team members and canned responses
+    api.getTeam().then(setTeamMembers).catch(() => {});
+    api.getCannedResponses().then(setCannedResponses).catch(() => {});
+  }, []);
+
+  const playNotificationSound = useCallback(() => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      oscillator.connect(gain);
+      gain.connect(audioCtx.destination);
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+      oscillator.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.3);
+    } catch {
+      // Audio not available
+    }
+  }, []);
 
   useEffect(() => {
     fetchConversations();
@@ -408,6 +466,17 @@ export default function InboxPage() {
 
     socket.on('new_message', (msg: Message) => {
       addMessage(msg);
+      // Play notification sound for incoming messages (not from current agent)
+      if (msg.messageType === 'incoming') {
+        playNotificationSound();
+        // Browser notification
+        if (typeof window !== 'undefined' && Notification.permission === 'granted') {
+          new Notification('New message', {
+            body: msg.content?.substring(0, 100) || 'New message received',
+            icon: '/favicon.ico',
+          });
+        }
+      }
     });
 
     // Listen for conversation updates (contact name/avatar, last message, etc.)
@@ -415,11 +484,16 @@ export default function InboxPage() {
       updateConversation(data);
     });
 
+    // Request notification permission
+    if (typeof window !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     return () => {
       socket.off('new_message');
       socket.off('conversation_updated');
     };
-  }, [fetchConversations, addMessage, updateConversation]);
+  }, [fetchConversations, addMessage, updateConversation, playNotificationSound]);
 
   useEffect(() => {
     if (!activeConversation) return;
@@ -429,6 +503,17 @@ export default function InboxPage() {
       socket.emit('leave_conversation', activeConversation.id);
     };
   }, [activeConversation]);
+
+  // Close assign dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (assignDropdownRef.current && !assignDropdownRef.current.contains(e.target as Node)) {
+        setShowAssignDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Sync contact form
   useEffect(() => {
@@ -499,6 +584,48 @@ export default function InboxPage() {
       contentType: 'sticker',
       contentAttributes: { packageId, stickerId },
     });
+  };
+
+  const handleAssign = async (assigneeId: number | null) => {
+    if (!activeConversation) return;
+    setShowAssignDropdown(false);
+    await api.assignConversation(activeConversation.id, assigneeId);
+    fetchConversations();
+  };
+
+  const handleCannedSelect = (response: CannedResponse) => {
+    setInput(response.content);
+    setShowCannedMenu(false);
+    setCannedFilter('');
+  };
+
+  // Handle "/" shortcut for canned responses
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    if (value.startsWith('/') && value.length >= 1) {
+      setShowCannedMenu(true);
+      setCannedFilter(value.slice(1).toLowerCase());
+    } else {
+      setShowCannedMenu(false);
+      setCannedFilter('');
+    }
+  };
+
+  const filteredCanned = cannedResponses.filter((cr) =>
+    !cannedFilter || cr.shortCode.toLowerCase().includes(cannedFilter) || cr.content.toLowerCase().includes(cannedFilter)
+  );
+
+  const handleSendNote = async () => {
+    if (!noteInput.trim() || !activeConversation) return;
+    setSendingNote(true);
+    try {
+      await sendMessage(activeConversation.id, noteInput.trim(), true);
+      setNoteInput('');
+    } catch {
+      // ignore
+    } finally {
+      setSendingNote(false);
+    }
   };
 
   const filteredConversations = conversations
@@ -642,6 +769,48 @@ export default function InboxPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {/* Assign Agent Dropdown */}
+                <div className="relative" ref={assignDropdownRef}>
+                  <button
+                    onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                    className="flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    {activeConversation.assignee?.name || 'Assign'}
+                  </button>
+                  {showAssignDropdown && (
+                    <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                      <button
+                        onClick={() => handleAssign(null)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+                      >
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-[10px]">—</span>
+                        Unassigned
+                      </button>
+                      {teamMembers.map((member) => (
+                        <button
+                          key={member.id}
+                          onClick={() => handleAssign(member.id)}
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                            activeConversation.assignee?.id === member.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                          }`}
+                        >
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-600">
+                            {member.name.charAt(0).toUpperCase()}
+                          </span>
+                          {member.name}
+                          {activeConversation.assignee?.id === member.id && (
+                            <svg className="ml-auto h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={async () => {
                     await api.updateConversationStatus(activeConversation.id, 'resolved');
@@ -716,14 +885,43 @@ export default function InboxPage() {
                     </>
                   )}
                 </button>
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                  placeholder="Type a message..."
-                  className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
-                />
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => handleInputChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        if (showCannedMenu && filteredCanned.length > 0) {
+                          e.preventDefault();
+                          handleCannedSelect(filteredCanned[0]);
+                        } else {
+                          handleSend();
+                        }
+                      }
+                      if (e.key === 'Escape') setShowCannedMenu(false);
+                    }}
+                    placeholder='Type a message... (type "/" for shortcuts)'
+                    className="w-full rounded-full border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+                  />
+                  {/* Canned Responses Popup */}
+                  {showCannedMenu && filteredCanned.length > 0 && (
+                    <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                      {filteredCanned.map((cr) => (
+                        <button
+                          key={cr.id}
+                          onClick={() => handleCannedSelect(cr)}
+                          className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-gray-50"
+                        >
+                          <span className="flex-shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-mono font-medium text-indigo-700">
+                            /{cr.shortCode}
+                          </span>
+                          <span className="truncate text-sm text-gray-600">{cr.content}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {activeConversation?.inbox.channelType === 'line' && (
                   <div className="relative">
                     <button
@@ -893,6 +1091,74 @@ export default function InboxPage() {
                   <span className="text-gray-500">Assignee</span>
                   <span className="text-gray-900">{activeConversation.assignee.name}</span>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Private Notes */}
+          <div className="space-y-3 border-t border-gray-100 p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Notes
+            </h4>
+            <div className="space-y-2">
+              {messages.filter((m) => m.private).map((note) => (
+                <div key={note.id} className="rounded-lg bg-yellow-50 p-2.5 ring-1 ring-yellow-200">
+                  <p className="text-xs text-gray-700">{note.content}</p>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400">{note.senderName || 'Agent'}</span>
+                    <span className="text-[10px] text-gray-400">{formatTime(note.createdAt)}</span>
+                  </div>
+                </div>
+              ))}
+              {messages.filter((m) => m.private).length === 0 && (
+                <p className="text-xs text-gray-400">No notes yet</p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <textarea
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendNote();
+                  }
+                }}
+                placeholder="Add a note..."
+                rows={2}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 placeholder-gray-400 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400/30"
+              />
+            </div>
+            <button
+              onClick={handleSendNote}
+              disabled={!noteInput.trim() || sendingNote}
+              className="w-full rounded-lg bg-yellow-100 py-1.5 text-xs font-medium text-yellow-800 transition hover:bg-yellow-200 disabled:opacity-50"
+            >
+              {sendingNote ? 'Saving...' : 'Add Note'}
+            </button>
+          </div>
+
+          {/* Quick Replies (Canned Responses) */}
+          <div className="space-y-3 border-t border-gray-100 p-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Quick Replies
+            </h4>
+            <div className="space-y-1.5">
+              {cannedResponses.length === 0 ? (
+                <p className="text-xs text-gray-400">No quick replies yet. Add them in Settings.</p>
+              ) : (
+                cannedResponses.map((cr) => (
+                  <button
+                    key={cr.id}
+                    onClick={() => setInput(cr.content)}
+                    className="flex w-full items-start gap-2 rounded-lg p-2 text-left transition hover:bg-gray-50"
+                  >
+                    <span className="flex-shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-mono font-medium text-indigo-700">
+                      /{cr.shortCode}
+                    </span>
+                    <span className="line-clamp-2 text-xs text-gray-600">{cr.content}</span>
+                  </button>
+                ))
               )}
             </div>
           </div>

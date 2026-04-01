@@ -17,11 +17,12 @@ model Account {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  users         User[]
-  inboxes       Inbox[]
-  contacts      Contact[]
-  conversations Conversation[]
-  messages      Message[]
+  users            User[]
+  inboxes          Inbox[]
+  contacts         Contact[]
+  conversations    Conversation[]
+  messages         Message[]
+  cannedResponses  CannedResponse[]
 
   @@map("accounts")
 }
@@ -165,4 +166,21 @@ model Message {
   @@unique([sourceId, inboxId])
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("messages")
+}
+
+// =============================================
+// Canned Responses (Quick Reply Templates)
+// =============================================
+model CannedResponse {
+  id        Int      @id @default(autoincrement())
+  accountId Int      @map("account_id")
+  shortCode String   @map("short_code") // e.g. "/greeting", "/thanks"
+  content   String   // The template text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([accountId, shortCode])
+  @@map("canned_responses")
 }
