@@ -421,6 +421,96 @@ function StickerPicker({ onSelect, onClose }: { onSelect: (packageId: string, st
   );
 }
 
+const EMOJI_CATEGORIES = [
+  {
+    name: 'Smileys',
+    emojis: [
+      '\u{1F600}','\u{1F603}','\u{1F604}','\u{1F601}','\u{1F606}','\u{1F605}','\u{1F602}','\u{1F923}',
+      '\u{1F60A}','\u{1F607}','\u{1F642}','\u{1F643}','\u{1F609}','\u{1F60C}','\u{1F60D}','\u{1F970}',
+      '\u{1F618}','\u{1F617}','\u{1F619}','\u{1F61A}','\u{1F60B}','\u{1F61B}','\u{1F61C}','\u{1F92A}',
+      '\u{1F61D}','\u{1F911}','\u{1F917}','\u{1F92D}','\u{1F92B}','\u{1F914}','\u{1F910}','\u{1F928}',
+    ],
+  },
+  {
+    name: 'Gestures',
+    emojis: [
+      '\u{1F44D}','\u{1F44E}','\u{1F44A}','\u{270A}','\u{1F91B}','\u{1F91C}','\u{1F44F}','\u{1F64C}',
+      '\u{1F450}','\u{1F932}','\u{1F91D}','\u{1F64F}','\u{270D}\u{FE0F}','\u{1F485}','\u{1F933}','\u{1F4AA}',
+      '\u{1F44B}','\u{1F91A}','\u{1F590}\u{FE0F}','\u{270B}','\u{1F596}','\u{1F44C}','\u{270C}\u{FE0F}','\u{1F91E}',
+    ],
+  },
+  {
+    name: 'Hearts',
+    emojis: [
+      '\u{2764}\u{FE0F}','\u{1F9E1}','\u{1F49B}','\u{1F49A}','\u{1F499}','\u{1F49C}','\u{1F5A4}','\u{1F90D}',
+      '\u{1F90E}','\u{1F498}','\u{1F49D}','\u{1F496}','\u{1F497}','\u{1F493}','\u{1F49E}','\u{1F495}',
+    ],
+  },
+  {
+    name: 'Objects',
+    emojis: [
+      '\u{1F525}','\u{2B50}','\u{1F31F}','\u{1F389}','\u{1F388}','\u{1F381}','\u{1F3C6}','\u{1F4A1}',
+      '\u{1F4F1}','\u{1F4BB}','\u{1F4E7}','\u{1F4AC}','\u{1F4A4}','\u{1F4A3}','\u{1F4A5}','\u{1F4AB}',
+    ],
+  },
+];
+
+function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState(0);
+  const category = EMOJI_CATEGORIES[activeTab];
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  return (
+    <div ref={panelRef} className="absolute bottom-12 right-0 z-50 w-[320px] rounded-xl border border-gray-200 bg-white shadow-xl">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+        <span className="text-xs font-semibold text-gray-600">Emoji</span>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      {/* Category tabs */}
+      <div className="flex gap-1 border-b border-gray-100 px-2 py-1.5">
+        {EMOJI_CATEGORIES.map((cat, i) => (
+          <button
+            key={cat.name}
+            onClick={() => setActiveTab(i)}
+            className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+              activeTab === i ? 'bg-[#06C755] text-white' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+      {/* Emoji grid */}
+      <div className="grid max-h-[240px] grid-cols-8 gap-0.5 overflow-y-auto p-2">
+        {category.emojis.map((emoji) => (
+          <button
+            key={emoji}
+            onClick={() => onSelect(emoji)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:bg-gray-100"
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function InboxPage() {
   const {
     conversations,
@@ -443,6 +533,7 @@ export default function InboxPage() {
   const [savingContact, setSavingContact] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [noteInput, setNoteInput] = useState('');
   const [sendingNote, setSendingNote] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -455,7 +546,13 @@ export default function InboxPage() {
   const [showLabelPicker, setShowLabelPicker] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [readAt, setReadAt] = useState<string | null>(null);
+  const [showSoldModal, setShowSoldModal] = useState(false);
+  const [soldAmount, setSoldAmount] = useState('');
+  const [soldCurrency, setSoldCurrency] = useState('THB');
+  const [soldLoading, setSoldLoading] = useState(false);
+  const [soldSuccess, setSoldSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const assignDropdownRef = useRef<HTMLDivElement>(null);
   const labelPickerRef = useRef<HTMLDivElement>(null);
@@ -672,6 +769,25 @@ export default function InboxPage() {
       contentType: 'sticker',
       contentAttributes: { packageId, stickerId },
     });
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    const el = inputRef.current;
+    if (el) {
+      const start = el.selectionStart ?? input.length;
+      const end = el.selectionEnd ?? input.length;
+      const newValue = input.slice(0, start) + emoji + input.slice(end);
+      setInput(newValue);
+      // Restore cursor position after the inserted emoji
+      requestAnimationFrame(() => {
+        const pos = start + emoji.length;
+        el.setSelectionRange(pos, pos);
+        el.focus();
+      });
+    } else {
+      setInput((prev) => prev + emoji);
+    }
+    setShowEmojiPicker(false);
   };
 
   const handleAssign = async (assigneeId: number | null) => {
@@ -981,6 +1097,27 @@ export default function InboxPage() {
                     </div>
                   )}
                 </div>
+                {(activeConversation.inbox.channelType === 'facebook' || activeConversation.inbox.channelType === 'instagram') && (
+                  <button
+                    onClick={() => {
+                      setSoldAmount('');
+                      setSoldCurrency('THB');
+                      setSoldSuccess(false);
+                      setShowSoldModal(true);
+                    }}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                      activeConversation.customAttributes?.conversionStatus === 'sold'
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    }`}
+                    title="Mark as Sold"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {activeConversation.customAttributes?.conversionStatus === 'sold' ? 'Sold' : 'Mark Sold'}
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     await api.updateConversationStatus(activeConversation.id, 'resolved');
@@ -1068,6 +1205,7 @@ export default function InboxPage() {
                 </button>
                 <div className="relative flex-1">
                   <input
+                    ref={inputRef}
                     type="text"
                     value={input}
                     onChange={(e) => handleInputChange(e.target.value)}
@@ -1128,15 +1266,36 @@ export default function InboxPage() {
                     </svg>
                   )}
                 </button>
+                {/* Emoji Picker */}
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowStickerPicker(false); }}
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                    title="Emoji"
+                  >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </button>
+                  {showEmojiPicker && (
+                    <EmojiPicker
+                      onSelect={handleEmojiSelect}
+                      onClose={() => setShowEmojiPicker(false)}
+                    />
+                  )}
+                </div>
                 {activeConversation?.inbox.channelType === 'line' && (
                   <div className="relative">
                     <button
-                      onClick={() => setShowStickerPicker(!showStickerPicker)}
+                      onClick={() => { setShowStickerPicker(!showStickerPicker); setShowEmojiPicker(false); }}
                       className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                       title="LINE Stickers"
                     >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <rect x="3" y="3" width="18" height="18" rx="3" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 14s1.5 2 4 2 4-2 4-2" />
+                        <circle cx="9" cy="10" r="1" fill="currentColor" stroke="none" />
+                        <circle cx="15" cy="10" r="1" fill="currentColor" stroke="none" />
                       </svg>
                     </button>
                     {showStickerPicker && (
@@ -1192,6 +1351,97 @@ export default function InboxPage() {
             className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      {/* Mark as Sold Modal */}
+      {showSoldModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowSoldModal(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Mark as Sold</h3>
+            {soldSuccess ? (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                  <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-600">Conversion tracked successfully!</p>
+                <button
+                  onClick={() => setShowSoldModal(false)}
+                  className="mt-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mb-3">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Amount (optional)
+                  </label>
+                  <input
+                    type="number"
+                    value={soldAmount}
+                    onChange={(e) => setSoldAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Currency
+                  </label>
+                  <select
+                    value={soldCurrency}
+                    onChange={(e) => setSoldCurrency(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="THB">THB</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowSoldModal(false)}
+                    className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                    disabled={soldLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!activeConversation) return;
+                      setSoldLoading(true);
+                      try {
+                        await api.trackConversion(activeConversation.id, {
+                          amount: soldAmount ? parseFloat(soldAmount) : undefined,
+                          currency: soldCurrency,
+                        });
+                        setSoldSuccess(true);
+                        fetchConversations();
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : 'Failed to track conversion');
+                      } finally {
+                        setSoldLoading(false);
+                      }
+                    }}
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                    disabled={soldLoading}
+                  >
+                    {soldLoading ? 'Sending...' : 'Confirm Sale'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

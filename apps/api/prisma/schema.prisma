@@ -127,9 +127,10 @@ model Conversation {
   messagesCount  Int       @default(0) @map("messages_count")
   lastActivityAt DateTime  @default(now()) @map("last_activity_at")
   waitingSince   DateTime? @map("waiting_since")
-  firstReplyAt   DateTime? @map("first_reply_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  firstReplyAt      DateTime? @map("first_reply_at")
+  customAttributes  Json      @default("{}") @map("custom_attributes")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   account  Account  @relation(fields: [accountId], references: [id])
   inbox    Inbox    @relation(fields: [inboxId], references: [id])

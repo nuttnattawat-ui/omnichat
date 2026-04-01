@@ -276,6 +276,14 @@ class ApiClient {
     });
   }
 
+  // Conversions
+  trackConversion(conversationId: number, data: { amount?: number; currency?: string }) {
+    return this.request<{ success: boolean; eventId?: string }>(`/conversions/${conversationId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Invite Team Member
   inviteTeamMember(data: { name: string; email: string; role?: string }) {
     return this.request<TeamMember & { tempPassword: string }>('/settings/team/invite', {
@@ -293,6 +301,7 @@ export interface Conversation {
   status: string;
   lastActivityAt: string;
   messagesCount: number;
+  customAttributes?: Record<string, unknown>;
   contact: { id: number; name: string; avatarUrl?: string };
   inbox: { id: number; name: string; channelType: string };
   assignee?: { id: number; name: string };
