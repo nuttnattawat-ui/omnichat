@@ -430,6 +430,7 @@ export default function InboxPage() {
   const [convLabels, setConvLabels] = useState<{ id: number; label: Label }[]>([]);
   const [showLabelPicker, setShowLabelPicker] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [readAt, setReadAt] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const notifAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -491,6 +492,11 @@ export default function InboxPage() {
       updateConversation(data);
     });
 
+    // Listen for read receipts
+    socket.on('message_read', (data: { conversationId: number; readAt: string }) => {
+      setReadAt(data.readAt);
+    });
+
     // Request notification permission
     if (typeof window !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -499,6 +505,7 @@ export default function InboxPage() {
     return () => {
       socket.off('new_message');
       socket.off('conversation_updated');
+      socket.off('message_read');
     };
   }, [fetchConversations, addMessage, updateConversation, playNotificationSound]);
 
@@ -525,8 +532,9 @@ export default function InboxPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Sync contact form + fetch labels
+  // Sync contact form + fetch labels + reset read receipt
   useEffect(() => {
+    setReadAt(null);
     if (activeConversation) {
       setContactForm({
         name: activeConversation.contact.name || '',
@@ -954,6 +962,17 @@ export default function InboxPage() {
                   </div>
                 </div>
               ))}
+              {/* Read receipt indicator */}
+              {readAt && (
+                <div className="flex justify-end pr-2">
+                  <span className="flex items-center gap-1 text-[10px] text-blue-500">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Read {formatTime(readAt)}
+                  </span>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 

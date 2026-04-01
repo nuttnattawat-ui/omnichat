@@ -37,6 +37,25 @@ export class FacebookAdapter implements ChannelAdapter {
     return messages;
   }
 
+  /** Parse read receipt events from webhook payload */
+  parseReadReceipts(body: Record<string, unknown>): { senderId: string; watermark: number }[] {
+    const reads: { senderId: string; watermark: number }[] = [];
+    const entries = (body.entry || []) as Record<string, unknown>[];
+
+    for (const entry of entries) {
+      const messagingEvents = (entry.messaging || []) as Record<string, unknown>[];
+      for (const event of messagingEvents) {
+        if (event.read) {
+          const sender = event.sender as Record<string, string>;
+          const read = event.read as { watermark: number };
+          reads.push({ senderId: sender.id, watermark: read.watermark });
+        }
+      }
+    }
+
+    return reads;
+  }
+
   protected normalizeEvent(
     event: Record<string, unknown>,
     channel: 'facebook' | 'instagram',
@@ -92,17 +111,19 @@ export class FacebookAdapter implements ChannelAdapter {
   ): Promise<{ name: string; profilePic?: string }> {
     this.logger.log(`Fetching FB profile for ${userId}`);
     const response = await fetch(
-      `https://graph.facebook.com/v19.0/${userId}?fields=name,profile_pic&access_token=${pageAccessToken}`,
+      `https://graph.facebook.com/v19.0/${userId}?fields=first_name,last_name,profile_pic&access_token=${pageAccessToken}`,
     );
 
     if (!response.ok) {
       const error = await response.text();
+      this.logger.error(`Facebook Profile API ${response.status}: ${error}`);
       throw new Error(`Facebook Profile API ${response.status}: ${error}`);
     }
 
-    const data = await response.json() as { name?: string; profile_pic?: string };
-    this.logger.log(`FB profile: name=${data.name}, pic=${!!data.profile_pic}`);
-    return { name: data.name || 'Facebook User', profilePic: data.profile_pic };
+    const data = await response.json() as { first_name?: string; last_name?: string; name?: string; profile_pic?: string };
+    const displayName = [data.first_name, data.last_name].filter(Boolean).join(' ') || data.name || 'Facebook User';
+    this.logger.log(`FB profile: name=${displayName}, pic=${!!data.profile_pic}`);
+    return { name: displayName, profilePic: data.profile_pic };
   }
 
   async sendMessage(
