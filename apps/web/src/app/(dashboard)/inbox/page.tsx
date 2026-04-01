@@ -443,8 +443,14 @@ export default function InboxPage() {
 
   // Auto-scroll to bottom
   useEffect(() => {
+    // Immediate scroll (for text messages)
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    // Delayed scroll (wait for images/stickers to load)
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [messages, activeConversation]);
 
   const handleSend = async () => {
     if (!input.trim() || !activeConversation) return;
