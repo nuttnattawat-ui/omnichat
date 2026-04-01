@@ -56,13 +56,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .emit('new_message', message);
   }
 
-  /** Broadcast conversation update to account room */
+  /** Broadcast conversation update to account room + all connected clients */
   broadcastConversationUpdate(
     accountId: number,
     conversation: Record<string, unknown>,
   ) {
+    // Emit to account room
     this.server
       .to(`account:${accountId}`)
       .emit('conversation_updated', conversation);
+    // Also emit globally so all connected dashboards get the update
+    this.server.emit('conversation_updated', conversation);
   }
 }

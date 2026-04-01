@@ -40,9 +40,8 @@ export class LineAdapter implements ChannelAdapter {
       contentType: this.mapContentType(messageType),
       contentAttributes: {
         lineMessageType: messageType,
-        stickerId: message.stickerId,
-        packageId: message.packageId,
-        originalPayload: event,
+        ...(message.stickerId ? { stickerId: String(message.stickerId) } : {}),
+        ...(message.packageId ? { packageId: String(message.packageId) } : {}),
       },
       timestamp: new Date(event.timestamp as number),
       replyToken: event.replyToken as string,

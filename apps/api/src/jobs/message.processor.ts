@@ -99,10 +99,11 @@ export class MessageProcessor {
       });
     }
 
-    // 3.5 Update existing contact profile if missing (for contacts created before profile fetch)
+    // 3.5 Update contact profile from LINE API (always try if name/avatar missing or stale)
     if (contactInbox.contact && msg.channel === 'line') {
       const contact = contactInbox.contact;
-      if (!contact.avatarUrl || contact.name === 'line user' || contact.name?.endsWith(' user')) {
+      const needsUpdate = !contact.avatarUrl || !contact.name || contact.name === `${msg.channel} user` || contact.name?.endsWith(' user');
+      if (needsUpdate) {
         try {
           const channelConfig = inbox.channelConfig as Record<string, string>;
           const profile = await this.lineAdapter.getUserProfile(
@@ -154,7 +155,11 @@ export class MessageProcessor {
         messageType: 'incoming',
         content: msg.content,
         contentType: msg.contentType,
-        contentAttributes: JSON.parse(JSON.stringify(msg.contentAttributes ?? {})),
+        contentAttributes: JSON.parse(JSON.stringify({
+          ...(msg.contentAttributes ?? {}),
+          originalPayload: undefined,
+          rawPayload: undefined,
+        })),
         sourceId: msg.platformMessageId,
         senderId: contactInbox.contactId,
         senderType: 'Contact',
@@ -181,6 +186,24 @@ export class MessageProcessor {
       ...savedMessage,
       senderName: contactInbox.contact.name,
       channel: msg.channel,
+    });
+
+    // 7.5 Broadcast conversation update (for sidebar: name, avatar, last message)
+    this.chatGateway.broadcastConversationUpdate(inbox.accountId, {
+      id: conversation.id,
+      contactId: contactInbox.contactId,
+      contact: {
+        id: contactInbox.contact.id,
+        name: contactInbox.contact.name,
+        avatarUrl: contactInbox.contact.avatarUrl,
+      },
+      lastMessage: {
+        content: msg.content,
+        contentType: msg.contentType,
+        createdAt: savedMessage.createdAt,
+      },
+      lastActivityAt: new Date(),
+      messagesCount: (conversation.messagesCount ?? 0) + 1,
     });
 
     // 8. AI auto-reply if enabled

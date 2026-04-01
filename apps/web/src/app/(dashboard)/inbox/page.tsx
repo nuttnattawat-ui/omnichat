@@ -51,13 +51,15 @@ function getInitials(name: string) {
 function ConversationItem({
   conv,
   isActive,
+  isRead,
   onClick,
 }: {
   conv: Conversation;
   isActive: boolean;
+  isRead: boolean;
   onClick: () => void;
 }) {
-  const lastMsg = conv.messages?.[0]?.content || '';
+  const lastMsg = conv.messages?.[0]?.content || (conv.messages?.[0]?.contentType === 'sticker' ? '🎉 Sticker' : '');
   return (
     <button
       onClick={onClick}
@@ -102,7 +104,7 @@ function ConversationItem({
         </div>
         <div className="flex items-center justify-between">
           <p className="truncate text-xs text-gray-500">{lastMsg || 'No messages yet'}</p>
-          {conv.status === 'open' && conv.messagesCount > 0 && (
+          {conv.status === 'open' && conv.messagesCount > 0 && !isRead && !isActive && (
             <span className="ml-2 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-[#06C755] px-1.5 text-[10px] font-bold text-white">
               {conv.messagesCount > 99 ? '99+' : conv.messagesCount}
             </span>
@@ -114,9 +116,9 @@ function ConversationItem({
 }
 
 function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
-  const packageId = attrs?.packageId as string | undefined;
-  const stickerId = attrs?.stickerId as string | undefined;
-  if (!packageId || !stickerId) {
+  const stickerId = attrs?.stickerId != null ? String(attrs.stickerId) : undefined;
+  const packageId = attrs?.packageId != null ? String(attrs.packageId) : undefined;
+  if (!stickerId) {
     return <span className="text-2xl">🎉</span>;
   }
   return (
@@ -125,7 +127,14 @@ function StickerView({ attrs }: { attrs?: Record<string, unknown> }) {
       alt="sticker"
       className="h-[120px] w-[120px] object-contain"
       onError={(e) => {
-        (e.target as HTMLImageElement).src = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`;
+        const img = e.target as HTMLImageElement;
+        // Try android URL as fallback, then show emoji
+        if (img.src.includes('/iPhone/')) {
+          img.src = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`;
+        } else {
+          img.style.display = 'none';
+          img.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-4xl">🎉</span>');
+        }
       }}
     />
   );
@@ -200,6 +209,8 @@ export default function InboxPage() {
     setActiveConversation,
     addMessage,
     sendMessage,
+    readConversationIds,
+    updateConversation,
   } = useChatStore();
 
   const [input, setInput] = useState('');
@@ -214,13 +225,21 @@ export default function InboxPage() {
   useEffect(() => {
     fetchConversations();
     const socket = connectSocket();
+
     socket.on('new_message', (msg: Message) => {
       addMessage(msg);
     });
+
+    // Listen for conversation updates (contact name/avatar, last message, etc.)
+    socket.on('conversation_updated', (data: any) => {
+      updateConversation(data);
+    });
+
     return () => {
       socket.off('new_message');
+      socket.off('conversation_updated');
     };
-  }, [fetchConversations, addMessage]);
+  }, [fetchConversations, addMessage, updateConversation]);
 
   useEffect(() => {
     if (!activeConversation) return;
@@ -348,6 +367,7 @@ export default function InboxPage() {
               key={conv.id}
               conv={conv}
               isActive={activeConversation?.id === conv.id}
+              isRead={readConversationIds.has(conv.id)}
               onClick={() => setActiveConversation(conv)}
             />
           ))}
