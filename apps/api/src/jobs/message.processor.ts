@@ -87,16 +87,24 @@ export class MessageProcessor {
           );
         }
       } else if (msg.channel === 'facebook' || msg.channel === 'instagram') {
-        try {
-          const channelConfig = inbox.channelConfig as Record<string, string>;
-          const token = channelConfig.pageAccessToken;
-          this.logger.log(`Fetching ${msg.channel} profile for ${msg.sender.platformId}`);
-          const profile = await this.facebookAdapter.getUserProfile(token, msg.sender.platformId);
-          displayName = profile.name;
-          avatarUrl = profile.profilePic;
-          this.logger.log(`Got ${msg.channel} profile: ${profile.name}, pic: ${!!profile.profilePic}`);
-        } catch (err) {
-          this.logger.error(`FAILED to fetch ${msg.channel} profile for ${msg.sender.platformId}: ${err}`);
+        const channelConfig = inbox.channelConfig as Record<string, string>;
+        const token = channelConfig.pageAccessToken;
+        this.logger.log(`Fetching ${msg.channel} profile for ${msg.sender.platformId}, tokenLength=${token?.length || 0}`);
+
+        // Try twice with a short delay between attempts
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const profile = await this.facebookAdapter.getUserProfile(token, msg.sender.platformId);
+            displayName = profile.name;
+            avatarUrl = profile.profilePic;
+            this.logger.log(`Got ${msg.channel} profile (attempt ${attempt + 1}): ${profile.name}, pic: ${!!profile.profilePic}`);
+            break;
+          } catch (err) {
+            this.logger.error(`FAILED to fetch ${msg.channel} profile for ${msg.sender.platformId} (attempt ${attempt + 1}): ${err}`);
+            if (attempt === 0) {
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
         }
       }
 

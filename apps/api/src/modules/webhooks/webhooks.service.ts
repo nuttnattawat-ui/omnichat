@@ -46,6 +46,7 @@ export class WebhooksService {
 
     for (const msg of messages) {
       try {
+        this.logger.log(`Facebook msg: mid=${msg.platformMessageId}, sender=${msg.sender.platformId}, type=${msg.contentType}`);
         await this.messageProcessor.handleIncomingMessage({ data: msg } as any);
         this.logger.log(`Processed Facebook message: ${msg.platformMessageId}`);
       } catch (err) {
