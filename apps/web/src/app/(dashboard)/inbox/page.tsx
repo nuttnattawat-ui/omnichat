@@ -8,17 +8,22 @@ import { api, Message, Conversation } from '@/lib/api';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 function resolveMediaUrl(content: string, sourceId?: string): string {
-  // If content is a proxy URL (/api/media/line/...), prepend API base
+  // Base64 data URL — use directly
+  if (content?.startsWith('data:')) {
+    return content;
+  }
+
+  // Proxy URL — prepend API base
   if (content?.startsWith('/api/')) {
     return `${API_URL}${content}`;
   }
 
-  // If content is a full URL, use as-is
+  // Full URL — use as-is
   if (content?.startsWith('http')) {
     return content;
   }
 
-  // Fallback: if content is empty but we have sourceId (LINE message ID), construct proxy URL
+  // Fallback: construct proxy URL from sourceId
   if (sourceId) {
     return `${API_URL}/api/media/line/${sourceId}`;
   }
