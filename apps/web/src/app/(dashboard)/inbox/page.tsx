@@ -356,12 +356,19 @@ function StickerPicker({ onSelect, onClose }: { onSelect: (packageId: string, st
             className="flex items-center justify-center rounded-lg p-1 transition hover:bg-gray-100"
           >
             <img
-              src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker.png`}
+              src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`}
               alt=""
               className="h-16 w-16 object-contain"
-              loading="lazy"
+              crossOrigin="anonymous"
               onError={(e) => {
-                (e.target as HTMLImageElement).style.opacity = '0.3';
+                const img = e.target as HTMLImageElement;
+                // Try android format as fallback
+                if (!img.dataset.retried) {
+                  img.dataset.retried = '1';
+                  img.src = `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/android/sticker.png`;
+                } else {
+                  img.style.opacity = '0.3';
+                }
               }}
             />
           </button>
