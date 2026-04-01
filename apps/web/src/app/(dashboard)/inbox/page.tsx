@@ -63,12 +63,12 @@ function getInitials(name: string) {
 function ConversationItem({
   conv,
   isActive,
-  isRead,
+  unreadCount,
   onClick,
 }: {
   conv: Conversation;
   isActive: boolean;
-  isRead: boolean;
+  unreadCount: number;
   onClick: () => void;
 }) {
   const lastMsg = conv.messages?.[0]?.content || (conv.messages?.[0]?.contentType === 'sticker' ? '🎉 Sticker' : '');
@@ -116,9 +116,9 @@ function ConversationItem({
         </div>
         <div className="flex items-center justify-between">
           <p className="truncate text-xs text-gray-500">{lastMsg || 'No messages yet'}</p>
-          {conv.status === 'open' && conv.messagesCount > 0 && !isRead && !isActive && (
+          {unreadCount > 0 && !isActive && (
             <span className="ml-2 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-[#06C755] px-1.5 text-[10px] font-bold text-white">
-              {conv.messagesCount > 99 ? '99+' : conv.messagesCount}
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </div>
@@ -221,7 +221,7 @@ export default function InboxPage() {
     setActiveConversation,
     addMessage,
     sendMessage,
-    readConversationIds,
+    getUnreadCount,
     updateConversation,
   } = useChatStore();
 
@@ -379,7 +379,7 @@ export default function InboxPage() {
               key={conv.id}
               conv={conv}
               isActive={activeConversation?.id === conv.id}
-              isRead={readConversationIds.has(conv.id)}
+              unreadCount={getUnreadCount(conv.id, conv.messagesCount)}
               onClick={() => setActiveConversation(conv)}
             />
           ))}

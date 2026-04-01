@@ -1,12 +1,30 @@
 import { create } from 'zustand';
 import { api, Conversation, Message } from '@/lib/api';
 
+// Persist read message counts in localStorage
+const STORAGE_KEY = 'omnichat_read_counts';
+
+function getReadCounts(): Record<number, number> {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveReadCount(conversationId: number, count: number) {
+  if (typeof window === 'undefined') return;
+  const counts = getReadCounts();
+  counts[conversationId] = count;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(counts));
+}
+
 interface ChatState {
   conversations: Conversation[];
   activeConversation: Conversation | null;
   messages: Message[];
   loading: boolean;
-  readConversationIds: Set<number>;
 
   fetchConversations: (filters?: {
     status?: string;
@@ -21,6 +39,7 @@ interface ChatState {
     isPrivate?: boolean,
   ) => Promise<void>;
   markAsRead: (conversationId: number) => void;
+  getUnreadCount: (conversationId: number, totalMessages: number) => number;
   updateConversation: (update: Partial<Conversation> & { id: number; contact?: { id: number; name: string; avatarUrl?: string }; lastMessage?: { content: string; contentType: string; createdAt: string } }) => void;
 }
 
@@ -29,7 +48,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeConversation: null,
   messages: [],
   loading: false,
-  readConversationIds: new Set<number>(),
 
   fetchConversations: async (filters) => {
     set({ loading: true });
@@ -68,14 +86,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
       private: isPrivate,
     });
     get().addMessage(message);
+    // Mark as read after sending (agent is active in this conversation)
+    get().markAsRead(conversationId);
   },
 
   markAsRead: (conversationId) => {
-    set((state) => {
-      const next = new Set(state.readConversationIds);
-      next.add(conversationId);
-      return { readConversationIds: next };
-    });
+    const conv = get().conversations.find((c) => c.id === conversationId);
+    if (conv) {
+      saveReadCount(conversationId, conv.messagesCount);
+    }
+  },
+
+  getUnreadCount: (conversationId, totalMessages) => {
+    const readCounts = getReadCounts();
+    const lastRead = readCounts[conversationId] || 0;
+    return Math.max(0, totalMessages - lastRead);
   },
 
   updateConversation: (update) => {
@@ -104,11 +129,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       // Also update activeConversation if it matches
       let activeConversation = state.activeConversation;
-      if (activeConversation?.id === update.id && update.contact) {
+      if (activeConversation?.id === update.id) {
         activeConversation = {
           ...activeConversation,
-          contact: { ...activeConversation.contact, ...update.contact },
+          ...(update.contact && { contact: { ...activeConversation.contact, ...update.contact } }),
+          ...(update.messagesCount != null && { messagesCount: update.messagesCount }),
         };
+        // Auto-mark as read if user is viewing this conversation
+        if (update.messagesCount != null) {
+          saveReadCount(update.id, update.messagesCount);
+        }
       }
 
       return { conversations, activeConversation };
