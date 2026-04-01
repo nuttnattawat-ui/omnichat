@@ -125,6 +125,8 @@ export class MessagesService {
         const config = conversation.inbox.channelConfig as Record<string, string>;
         const outgoing = { conversationId, content: data.content, contentType: (data.contentType || 'text') as any, contentAttributes: data.contentAttributes };
 
+        this.logger.log(`Sending ${outgoing.contentType} to ${conversation.inbox.channelType}, recipient=${contactInbox.sourceId}, attrs=${JSON.stringify(data.contentAttributes || {})}`);
+
         try {
           switch (conversation.inbox.channelType) {
             case 'line': {
@@ -136,7 +138,7 @@ export class MessagesService {
                 this.logger.log(`Using LINE Push for conv=${conversationId}`);
               }
               await this.lineAdapter.sendMessage(config, contactInbox.sourceId, outgoing, replyToken);
-              this.logger.log(`Sent LINE message to ${contactInbox.sourceId}`);
+              this.logger.log(`Sent LINE ${outgoing.contentType} to ${contactInbox.sourceId}`);
               break;
             }
             case 'facebook':
@@ -146,7 +148,7 @@ export class MessagesService {
               break;
           }
         } catch (err) {
-          this.logger.error(`Failed to send platform message: ${err}`);
+          this.logger.error(`Failed to send ${outgoing.contentType} via ${conversation.inbox.channelType}: ${err}`);
         }
       }
     }

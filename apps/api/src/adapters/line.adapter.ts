@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { ChannelAdapter } from '../common/interfaces/channel-adapter.interface';
 import {
@@ -8,6 +8,7 @@ import {
 
 @Injectable()
 export class LineAdapter implements ChannelAdapter {
+  private readonly logger = new Logger(LineAdapter.name);
   validateSignature(rawBody: Buffer, signature: string): boolean {
     const channelSecret = process.env.LINE_CHANNEL_SECRET || '';
     const hash = createHmac('sha256', channelSecret)
@@ -72,6 +73,7 @@ export class LineAdapter implements ChannelAdapter {
   ): Promise<void> {
     const token = channelConfig.channelAccessToken;
     const lineMessage = this.buildLineMessage(message);
+    this.logger.log(`LINE sendMessage: type=${message.contentType}, lineMsg=${JSON.stringify(lineMessage)}`);
 
     // Use reply if we have a replyToken (free), otherwise push (costs money)
     if (replyToken) {
