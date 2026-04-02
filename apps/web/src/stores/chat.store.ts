@@ -90,8 +90,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       contentAttributes: options?.contentAttributes,
     });
     get().addMessage(message);
-    // Mark as read after sending (agent is active in this conversation)
-    get().markAsRead(conversationId);
+    // Mark as read with incremented count (backend increments messagesCount)
+    const conv = get().conversations.find((c) => c.id === conversationId);
+    if (conv) {
+      saveReadCount(conversationId, conv.messagesCount + 1);
+    }
   },
 
   markAsRead: (conversationId) => {
