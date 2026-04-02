@@ -113,6 +113,7 @@ function ConversationItem({
             src={conv.contact.avatarUrl}
             alt={conv.contact.name}
             className="h-12 w-12 rounded-full object-cover"
+            referrerPolicy="no-referrer"
           />
         ) : (
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
@@ -972,6 +973,7 @@ export default function InboxPage() {
                     src={activeConversation.contact.avatarUrl}
                     alt=""
                     className="h-10 w-10 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
                   />
                 ) : (
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
@@ -1455,6 +1457,7 @@ export default function InboxPage() {
                 src={activeConversation.contact.avatarUrl}
                 alt=""
                 className="mb-3 h-16 w-16 rounded-full object-cover"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-lg font-semibold text-gray-600">
