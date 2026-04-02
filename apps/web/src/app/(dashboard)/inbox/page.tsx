@@ -302,15 +302,19 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
         </span>
       )}
 
-      <div
-        className={`relative max-w-[70%] px-4 py-2.5 ${
-          isIncoming
-            ? 'rounded-2xl rounded-bl-md bg-white text-gray-900 shadow-sm ring-1 ring-gray-100'
-            : isBot
-              ? 'rounded-2xl rounded-br-md bg-purple-500 text-white'
-              : 'rounded-2xl rounded-br-md bg-indigo-600 text-white'
-        }`}
-      >
+      <div className={`flex flex-col ${!isIncoming ? 'items-end' : 'items-start'}`}>
+        {!isIncoming && msg.senderName && (
+          <span className="mb-0.5 text-[10px] text-gray-400">{msg.senderName}</span>
+        )}
+        <div
+          className={`relative max-w-[70%] px-4 py-2.5 ${
+            isIncoming
+              ? 'rounded-2xl rounded-bl-md bg-white text-gray-900 shadow-sm ring-1 ring-gray-100'
+              : isBot
+                ? 'rounded-2xl rounded-br-md bg-purple-500 text-white'
+                : 'rounded-2xl rounded-br-md bg-indigo-600 text-white'
+          }`}
+        >
         {isBot && (
           <div className="mb-0.5 flex items-center gap-1 text-[10px] font-medium opacity-80">
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -320,6 +324,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
           </div>
         )}
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
+        </div>
       </div>
 
       {isIncoming && (
@@ -1107,9 +1112,10 @@ export default function InboxPage() {
                       setSoldSuccess(false);
                       setShowSoldModal(true);
                     }}
+                    disabled={activeConversation.customAttributes?.conversionStatus === 'sold'}
                     className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                       activeConversation.customAttributes?.conversionStatus === 'sold'
-                        ? 'bg-amber-100 text-amber-700'
+                        ? 'bg-amber-100 text-amber-700 cursor-not-allowed opacity-60'
                         : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                     }`}
                     title="Mark as Sold"

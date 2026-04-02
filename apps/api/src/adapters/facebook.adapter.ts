@@ -73,8 +73,15 @@ export class FacebookAdapter implements ChannelAdapter {
     if (attachments?.length) {
       const attachment = attachments[0];
       const payload = attachment.payload as Record<string, string>;
-      contentType = this.mapAttachmentType(attachment.type as string);
-      content = payload?.url || content;
+      const url = payload?.url || '';
+
+      // Detect Facebook stickers (thumbs up, etc.) by sticker_id in URL
+      if (attachment.type === 'image' && url.includes('sticker_id')) {
+        contentType = 'sticker';
+      } else {
+        contentType = this.mapAttachmentType(attachment.type as string);
+      }
+      content = url || content;
     }
 
     return {

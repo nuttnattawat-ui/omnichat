@@ -40,6 +40,13 @@ export class ConversionsController {
       throw new NotFoundException('Conversation not found');
     }
 
+    // Prevent duplicate conversion tracking
+    const existingCustomAttrs =
+      (conversation.customAttributes as Record<string, unknown>) || {};
+    if (existingCustomAttrs.conversionStatus === 'sold') {
+      return { success: true, eventId: undefined, alreadySold: true };
+    }
+
     // 2. Find contactInbox to get the sourceId (Facebook PSID)
     const contactInbox = await this.prisma.contactInbox.findFirst({
       where: {
@@ -60,7 +67,8 @@ export class ConversionsController {
     const pixelId = process.env.META_PIXEL_ID;
     const capiToken = process.env.META_CAPI_TOKEN;
 
-    let eventId: string | undefined;
+    // Generate a unique event_id for Facebook deduplication
+    const eventId = `conv_${conversationId}_${Date.now()}`;
 
     if (pixelId && capiToken) {
       const hashedContactId = createHash('sha256')
@@ -72,6 +80,7 @@ export class ConversionsController {
           {
             event_name: 'Purchase',
             event_time: Math.floor(Date.now() / 1000),
+            event_id: eventId,
             action_source: 'website',
             user_data: {
               external_id: hashedContactId,
@@ -104,10 +113,6 @@ export class ConversionsController {
             result?.error?.message || 'Failed to send event to Facebook',
           );
         }
-
-        eventId = result?.events_received
-          ? `fb_${Date.now()}`
-          : undefined;
 
         this.logger.log(
           `Facebook CAPI Purchase event sent for conversation #${conversationId}`,
