@@ -26,14 +26,42 @@ export class MessageProcessor {
       `Processing ${msg.channel} message: ${msg.platformMessageId}`,
     );
 
-    // 1. Find or create inbox
-    const inbox = await this.prisma.inbox.findFirst({
-      where: { channelType: msg.channel, enabled: true },
-    });
+    // 1. Find inbox — match by Page ID (recipientId) if available, else by channel
+    let inbox = null;
+    if (msg.recipientId && (msg.channel === 'facebook' || msg.channel === 'instagram')) {
+      // Match Facebook/Instagram inbox by Page ID stored in channelConfig.pageId
+      const allInboxes = await this.prisma.inbox.findMany({
+        where: { channelType: msg.channel, enabled: true },
+      });
+      inbox = allInboxes.find((i) => {
+        const config = i.channelConfig as Record<string, string>;
+        return config.pageId === msg.recipientId;
+      }) || allInboxes[0]; // fallback to first if pageId not configured
+      if (inbox) {
+        this.logger.log(`Matched inbox ${inbox.id} by pageId=${msg.recipientId}`);
+      }
+    }
+    if (!inbox) {
+      inbox = await this.prisma.inbox.findFirst({
+        where: { channelType: msg.channel, enabled: true },
+      });
+    }
 
     if (!inbox) {
       this.logger.warn(`No active inbox for channel: ${msg.channel}`);
       return;
+    }
+
+    // Auto-save Page ID into inbox config if not set yet (for correct inbox matching)
+    if (msg.recipientId && (msg.channel === 'facebook' || msg.channel === 'instagram')) {
+      const config = inbox.channelConfig as Record<string, string>;
+      if (!config.pageId) {
+        this.logger.log(`Auto-saving pageId=${msg.recipientId} to inbox ${inbox.id}`);
+        await this.prisma.inbox.update({
+          where: { id: inbox.id },
+          data: { channelConfig: { ...config, pageId: msg.recipientId } },
+        });
+      }
     }
 
     // 2. Dedup check

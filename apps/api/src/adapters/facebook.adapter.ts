@@ -61,6 +61,7 @@ export class FacebookAdapter implements ChannelAdapter {
     channel: 'facebook' | 'instagram',
   ): NormalizedMessage {
     const sender = event.sender as Record<string, string>;
+    const recipient = event.recipient as Record<string, string>;
     const message = event.message as Record<string, unknown>;
     const attachments = message.attachments as
       | Record<string, unknown>[]
@@ -82,6 +83,7 @@ export class FacebookAdapter implements ChannelAdapter {
       sender: {
         platformId: sender.id,
       },
+      recipientId: recipient?.id, // Page ID — used to match the correct inbox
       content,
       contentType,
       contentAttributes: {

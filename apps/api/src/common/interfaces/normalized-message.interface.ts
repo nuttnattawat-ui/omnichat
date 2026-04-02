@@ -11,6 +11,7 @@ export interface NormalizedMessage {
   contentAttributes?: Record<string, unknown>;
   timestamp: Date;
   replyToken?: string; // LINE-specific
+  recipientId?: string; // Page ID (Facebook/Instagram) for inbox matching
   rawPayload: Record<string, unknown>;
 }
 

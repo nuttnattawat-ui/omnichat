@@ -27,11 +27,13 @@ const channelFields: Record<string, { key: string; label: string; placeholder: s
     { key: 'channelSecret', label: 'Channel Secret', placeholder: 'LINE Channel Secret' },
   ],
   facebook: [
+    { key: 'pageId', label: 'Page ID', placeholder: 'Facebook Page ID (auto-filled from webhook)' },
     { key: 'pageAccessToken', label: 'Page Access Token', placeholder: 'Facebook Page Access Token' },
     { key: 'appSecret', label: 'App Secret', placeholder: 'Meta App Secret' },
     { key: 'verifyToken', label: 'Verify Token', placeholder: 'Webhook Verify Token' },
   ],
   instagram: [
+    { key: 'pageId', label: 'Page ID', placeholder: 'Instagram Page ID (auto-filled from webhook)' },
     { key: 'pageAccessToken', label: 'Page Access Token', placeholder: 'Instagram Page Access Token' },
     { key: 'appSecret', label: 'App Secret', placeholder: 'Meta App Secret' },
     { key: 'verifyToken', label: 'Verify Token', placeholder: 'Webhook Verify Token' },
