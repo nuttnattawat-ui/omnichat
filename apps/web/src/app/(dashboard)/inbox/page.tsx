@@ -1199,8 +1199,13 @@ export default function InboxPage() {
                   </div>
                 </div>
               ))}
-              {/* Read receipt indicator */}
-              {readAt && (
+              {/* Read receipt indicator — only show if customer read AFTER last outgoing message */}
+              {readAt && (() => {
+                const lastOutgoing = [...messages].reverse().find(m => m.messageType === 'outgoing');
+                const readTime = new Date(readAt).getTime();
+                const lastOutTime = lastOutgoing ? new Date(lastOutgoing.createdAt).getTime() : 0;
+                if (!lastOutgoing || readTime < lastOutTime) return null;
+                return (
                 <div className="flex justify-end pr-2">
                   <span className="flex items-center gap-1 text-[10px] text-blue-500">
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1209,7 +1214,8 @@ export default function InboxPage() {
                     Read {formatTime(readAt)}
                   </span>
                 </div>
-              )}
+                );
+              })()}
               <div ref={messagesEndRef} />
             </div>
 
