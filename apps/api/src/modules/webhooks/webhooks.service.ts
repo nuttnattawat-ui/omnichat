@@ -87,6 +87,18 @@ export class WebhooksService {
     const readAt = new Date(watermark);
     this.logger.log(`Read receipt: conv=${conversation.id}, sender=${senderPlatformId}, readAt=${readAt.toISOString()}`);
 
+    // Persist readAt in conversation customAttributes so it survives page reloads
+    const existingAttrs = (conversation.customAttributes as Record<string, unknown>) || {};
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: {
+        customAttributes: {
+          ...existingAttrs,
+          contactReadAt: readAt.toISOString(),
+        },
+      },
+    });
+
     // Broadcast read event to conversation room
     this.chatGateway.server
       .to(`conversation:${conversation.id}`)

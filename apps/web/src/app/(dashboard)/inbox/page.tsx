@@ -633,7 +633,11 @@ export default function InboxPage() {
     const socket = connectSocket();
 
     socket.on('new_message', (msg: Message) => {
-      addMessage(msg);
+      // Only add to message list if it belongs to the active conversation
+      const currentConv = useChatStore.getState().activeConversation;
+      if (currentConv && msg.conversationId === currentConv.id) {
+        addMessage(msg);
+      }
       // Play notification sound for incoming messages (not from current agent)
       if (msg.messageType === 'incoming') {
         playNotificationSound();
@@ -652,9 +656,14 @@ export default function InboxPage() {
       updateConversation(data);
     });
 
-    // Listen for read receipts
+    // Listen for read receipts — persist in conversation store
     socket.on('message_read', (data: { conversationId: number; readAt: string }) => {
       setReadAt(data.readAt);
+      // Update the conversation's customAttributes so readAt survives tab switches
+      updateConversation({
+        id: data.conversationId,
+        customAttributes: { contactReadAt: data.readAt },
+      } as any);
     });
 
     // Request notification permission
@@ -694,7 +703,9 @@ export default function InboxPage() {
 
   // Sync contact form + fetch labels + reset read receipt + auto refresh profile
   useEffect(() => {
-    setReadAt(null);
+    // Restore persisted read receipt from conversation customAttributes
+    const savedReadAt = (activeConversation?.customAttributes as Record<string, unknown>)?.contactReadAt as string | undefined;
+    setReadAt(savedReadAt || null);
     if (activeConversation) {
       setContactForm({
         name: activeConversation.contact.name || '',

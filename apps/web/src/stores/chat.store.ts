@@ -131,6 +131,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ...(update.lastMessage && {
             messages: [{ content: update.lastMessage.content, contentType: update.lastMessage.contentType, createdAt: update.lastMessage.createdAt } as Message],
           }),
+          ...((update as any).customAttributes && {
+            customAttributes: { ...(conv.customAttributes as Record<string, unknown> || {}), ...(update as any).customAttributes },
+          }),
         };
       });
 
@@ -141,6 +144,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           ...activeConversation,
           ...(update.contact && { contact: { ...activeConversation.contact, ...update.contact } }),
           ...(update.messagesCount != null && { messagesCount: update.messagesCount }),
+          ...((update as any).customAttributes && {
+            customAttributes: { ...(activeConversation.customAttributes as Record<string, unknown> || {}), ...(update as any).customAttributes },
+          }),
         };
         // Auto-mark as read if user is viewing this conversation
         if (update.messagesCount != null) {

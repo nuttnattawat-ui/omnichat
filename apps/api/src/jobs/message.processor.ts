@@ -158,7 +158,9 @@ export class MessageProcessor {
     if (contactInbox.contact) {
       const contact = contactInbox.contact;
       const nameLower = contact.name?.toLowerCase() || '';
-      const hasValidAvatar = contact.avatarUrl && !contact.avatarUrl.includes('graph.facebook.com');
+      // graph.facebook.com/*/picture URLs are permanent (won't expire), CDN URLs (scontent-*.fbcdn.net) expire
+      const isExpiredCdnAvatar = contact.avatarUrl?.includes('fbcdn.net') || contact.avatarUrl?.includes('scontent');
+      const hasValidAvatar = contact.avatarUrl && !isExpiredCdnAvatar;
       const needsUpdate = !hasValidAvatar || !contact.name || nameLower === `${msg.channel} user` || nameLower.endsWith(' user') || nameLower === 'unknown';
       this.logger.log(`Contact ${contact.id}: name="${contact.name}", avatarUrl=${!!contact.avatarUrl}, needsUpdate=${needsUpdate}, senderPlatformId=${msg.sender.platformId}, storedSourceId=${contactInbox.sourceId}`);
 
