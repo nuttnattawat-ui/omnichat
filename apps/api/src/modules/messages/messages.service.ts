@@ -112,6 +112,18 @@ export class MessagesService {
       senderName: sender?.name || 'Agent',
     });
 
+    // Broadcast conversation update for sidebar (last message preview)
+    this.chatGateway.broadcastConversationUpdate(accountId, {
+      id: conversationId,
+      lastMessage: {
+        content: data.content,
+        contentType: data.contentType || 'text',
+        createdAt: message.createdAt,
+      },
+      lastActivityAt: new Date(),
+      messagesCount: (conversation.messagesCount ?? 0) + 1,
+    });
+
     // Send to platform (unless it's a private note)
     if (!data.private) {
       const contactInbox = await this.prisma.contactInbox.findFirst({
