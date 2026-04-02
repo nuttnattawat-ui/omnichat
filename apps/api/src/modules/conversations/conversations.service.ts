@@ -23,6 +23,7 @@ export class ConversationsService {
         inbox: { select: { id: true, name: true, channelType: true } },
         assignee: { select: { id: true, name: true } },
         messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        labels: { include: { label: true } },
       },
       orderBy: { lastActivityAt: 'desc' },
       skip: (page - 1) * limit,

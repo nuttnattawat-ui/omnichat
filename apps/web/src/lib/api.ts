@@ -313,6 +313,7 @@ export interface Conversation {
   inbox: { id: number; name: string; channelType: string };
   assignee?: { id: number; name: string };
   messages?: Message[];
+  labels?: { id: number; label: { id: number; title: string; color?: string } }[];
 }
 
 export interface Message {
