@@ -1413,21 +1413,7 @@ export default function InboxPage() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
-                <div className="mb-4">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Currency
-                  </label>
-                  <select
-                    value={soldCurrency}
-                    onChange={(e) => setSoldCurrency(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="THB">THB</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                  </select>
-                </div>
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-2 mt-4">
                   <button
                     onClick={() => setShowSoldModal(false)}
                     className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -1442,7 +1428,7 @@ export default function InboxPage() {
                       try {
                         await api.trackConversion(activeConversation.id, {
                           amount: soldAmount ? parseFloat(soldAmount) : undefined,
-                          currency: soldCurrency,
+                          currency: 'THB',
                         });
                         setSoldSuccess(true);
                         fetchConversations();
