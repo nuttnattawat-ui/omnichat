@@ -159,7 +159,16 @@ export class FacebookAdapter implements ChannelAdapter {
           const user = participants?.find((p) => String(p.id) === userId);
           if (user?.name) {
             this.logger.log(`Got name from Conversations API: ${user.name}`);
-            return { name: String(user.name) };
+            // Try to get profile pic via public URL
+            const picUrl = `https://graph.facebook.com/${userId}/picture?type=large&access_token=${pageAccessToken}`;
+            let profilePic: string | undefined;
+            try {
+              const picRes = await fetch(picUrl, { redirect: 'follow' });
+              if (picRes.ok && picRes.headers.get('content-type')?.startsWith('image')) {
+                profilePic = picRes.url; // resolved redirect URL
+              }
+            } catch { /* ignore */ }
+            return { name: String(user.name), profilePic };
           }
         }
       }
