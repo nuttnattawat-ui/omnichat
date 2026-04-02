@@ -159,23 +159,9 @@ export class FacebookAdapter implements ChannelAdapter {
           const user = participants?.find((p) => String(p.id) === userId);
           if (user?.name) {
             this.logger.log(`Got name from Conversations API: ${user.name}`);
-            // Download profile picture and convert to base64 data URL
-            let profilePic: string | undefined;
-            try {
-              const picRes = await fetch(
-                `https://graph.facebook.com/${userId}/picture?type=large&access_token=${pageAccessToken}`,
-                { redirect: 'follow' },
-              );
-              if (picRes.ok) {
-                const buffer = Buffer.from(await picRes.arrayBuffer());
-                const contentType = picRes.headers.get('content-type') || 'image/jpeg';
-                profilePic = `data:${contentType};base64,${buffer.toString('base64')}`;
-                this.logger.log(`Downloaded FB profile pic: ${buffer.length} bytes`);
-              }
-            } catch (picErr) {
-              this.logger.warn(`FB picture download error: ${picErr}`);
-            }
-            return { name: String(user.name), profilePic };
+            // Profile pic not available for this user (API returns error 100)
+            // Return null explicitly so Prisma clears any stale URL
+            return { name: String(user.name), profilePic: undefined };
           }
         }
       }

@@ -138,7 +138,7 @@ export class ContactsController {
             const profile = await this.facebookAdapter.getUserProfile(config.pageAccessToken, ci.sourceId);
             await this.prisma.contact.update({
               where: { id },
-              data: { name: profile.name, avatarUrl: profile.profilePic },
+              data: { name: profile.name, avatarUrl: profile.profilePic || null },
             });
             this.logger.log(`Refreshed ${ci.inbox.channelType} profile for contact ${id}: ${profile.name}`);
             return { name: profile.name, avatarUrl: profile.profilePic };

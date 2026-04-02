@@ -192,11 +192,11 @@ export class MessageProcessor {
             const profile = await this.facebookAdapter.getUserProfile(token, platformId);
             await this.prisma.contact.update({
               where: { id: contact.id },
-              data: { name: profile.name, avatarUrl: profile.profilePic },
+              data: { name: profile.name, avatarUrl: profile.profilePic || null },
             });
             contactInbox.contact.name = profile.name;
-            contactInbox.contact.avatarUrl = profile.profilePic ?? null;
-            this.logger.log(`Updated ${msg.channel} profile for contact ${contact.id}: ${profile.name}`);
+            contactInbox.contact.avatarUrl = profile.profilePic || null;
+            this.logger.log(`Updated ${msg.channel} profile for contact ${contact.id}: ${profile.name}, pic=${!!profile.profilePic}`);
           }
         } catch (err) {
           this.logger.error(`FAILED to update profile for contact ${contact.id}: ${err}`);
