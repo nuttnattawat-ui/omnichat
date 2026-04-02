@@ -159,13 +159,25 @@ export class MessageProcessor {
       const contact = contactInbox.contact;
       const nameLower = contact.name?.toLowerCase() || '';
       const needsUpdate = !contact.avatarUrl || !contact.name || nameLower === `${msg.channel} user` || nameLower.endsWith(' user') || nameLower === 'unknown';
-      this.logger.log(`Contact ${contact.id}: name="${contact.name}", avatarUrl=${!!contact.avatarUrl}, needsUpdate=${needsUpdate}`);
+      this.logger.log(`Contact ${contact.id}: name="${contact.name}", avatarUrl=${!!contact.avatarUrl}, needsUpdate=${needsUpdate}, senderPlatformId=${msg.sender.platformId}, storedSourceId=${contactInbox.sourceId}`);
+
+      // Fix sourceId if it changed (shouldn't happen but just in case)
+      if (contactInbox.sourceId !== msg.sender.platformId) {
+        this.logger.warn(`Contact ${contact.id} sourceId mismatch: stored="${contactInbox.sourceId}" vs webhook="${msg.sender.platformId}" — updating`);
+        await this.prisma.contactInbox.update({
+          where: { id: contactInbox.id },
+          data: { sourceId: msg.sender.platformId },
+        });
+      }
+
       if (needsUpdate) {
         try {
           const channelConfig = inbox.channelConfig as Record<string, string>;
+          // Always use the PSID from the current webhook (msg.sender.platformId), not the stored one
+          const platformId = msg.sender.platformId;
           if (msg.channel === 'line') {
             const token = channelConfig.channelAccessToken;
-            const profile = await this.lineAdapter.getUserProfile(token, msg.sender.platformId);
+            const profile = await this.lineAdapter.getUserProfile(token, platformId);
             await this.prisma.contact.update({
               where: { id: contact.id },
               data: { name: profile.displayName, avatarUrl: profile.pictureUrl },
@@ -175,7 +187,8 @@ export class MessageProcessor {
             this.logger.log(`Updated LINE profile for contact ${contact.id}: ${profile.displayName}`);
           } else if (msg.channel === 'facebook' || msg.channel === 'instagram') {
             const token = channelConfig.pageAccessToken;
-            const profile = await this.facebookAdapter.getUserProfile(token, msg.sender.platformId);
+            this.logger.log(`Calling getUserProfile with token length=${token?.length || 0}, platformId=${platformId}`);
+            const profile = await this.facebookAdapter.getUserProfile(token, platformId);
             await this.prisma.contact.update({
               where: { id: contact.id },
               data: { name: profile.name, avatarUrl: profile.profilePic },
