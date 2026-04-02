@@ -738,14 +738,18 @@ export default function InboxPage() {
     }
   }, [activeConversation]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom — only when messages change, not on activeConversation metadata updates
   const prevConvRef = useRef<number | null>(null);
+  const prevMsgCountRef = useRef<number>(0);
   useEffect(() => {
     const isNewConv = activeConversation?.id !== prevConvRef.current;
+    const msgCountChanged = messages.length !== prevMsgCountRef.current;
     prevConvRef.current = activeConversation?.id ?? null;
+    prevMsgCountRef.current = messages.length;
 
-    // When opening a conversation or first load: instant scroll (no animation)
-    // When new message arrives in same conversation: smooth scroll
+    // Only scroll when conversation changes or new messages arrive
+    if (!isNewConv && !msgCountChanged) return;
+
     const behavior = isNewConv ? 'instant' as ScrollBehavior : 'smooth';
     messagesEndRef.current?.scrollIntoView({ behavior });
 
@@ -754,7 +758,7 @@ export default function InboxPage() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
     }, 150);
     return () => clearTimeout(timer);
-  }, [messages, activeConversation]);
+  }, [messages, activeConversation?.id]);
 
   const handleSend = async () => {
     if (!input.trim() || !activeConversation) return;
