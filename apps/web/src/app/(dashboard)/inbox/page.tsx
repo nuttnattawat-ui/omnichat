@@ -647,11 +647,7 @@ export default function InboxPage() {
     const socket = connectSocket();
 
     socket.on('new_message', (msg: Message) => {
-      // Only add to message list if it belongs to the active conversation
-      const currentConv = useChatStore.getState().activeConversation;
-      if (currentConv && msg.conversationId === currentConv.id) {
-        addMessage(msg);
-      }
+      addMessage(msg);
       // Play notification sound for incoming messages (not from current agent)
       if (msg.messageType === 'incoming') {
         playNotificationSound();

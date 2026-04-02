@@ -49,13 +49,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`${client.id} joined ${room}`);
   }
 
-  /** Broadcast new message to conversation room + globally */
+  /** Broadcast new message to conversation room + account room */
   broadcastMessage(conversationId: number, message: Record<string, unknown>) {
+    // Send to conversation room (agents viewing this conversation)
     this.server
       .to(`conversation:${conversationId}`)
       .emit('new_message', message);
-    // Also emit globally so messages are never missed (frontend filters by conversationId)
-    this.server.emit('new_message', { ...message, conversationId });
   }
 
   /** Broadcast conversation update to account room + all connected clients */
