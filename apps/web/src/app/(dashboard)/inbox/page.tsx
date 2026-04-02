@@ -250,7 +250,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
     return (
       <div className="flex items-end gap-2 justify-end">
         <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>
-        <div className="relative max-w-[85%] rounded-2xl rounded-br-md bg-yellow-100 px-4 py-2.5 text-gray-800 ring-1 ring-yellow-200">
+        <div className="relative max-w-[95%] rounded-2xl rounded-br-md bg-yellow-100 px-4 py-2.5 text-gray-800 ring-1 ring-yellow-200">
           <div className="mb-0.5 flex items-center gap-1 text-[10px] font-medium text-yellow-700">
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -321,7 +321,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
           <span className="mb-0.5 text-[10px] text-gray-400">{msg.senderName}</span>
         )}
         <div
-          className={`relative max-w-[85%] px-4 py-2.5 ${
+          className={`relative max-w-[95%] px-4 py-2.5 ${
             isIncoming
               ? 'rounded-2xl rounded-bl-md bg-white text-gray-900 shadow-sm ring-1 ring-gray-100'
               : isBot
