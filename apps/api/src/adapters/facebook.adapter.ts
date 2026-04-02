@@ -113,33 +113,61 @@ export class FacebookAdapter implements ChannelAdapter {
   ): Promise<{ name: string; profilePic?: string }> {
     this.logger.log(`Fetching FB profile for ${userId}, token length=${pageAccessToken?.length || 0}`);
 
-    // Try with name field as well (some API versions support it)
-    const response = await fetch(
-      `https://graph.facebook.com/v21.0/${userId}?fields=first_name,last_name,name,profile_pic&access_token=${pageAccessToken}`,
-    );
+    // Try multiple API versions — some users only work on specific versions
+    const versions = ['v21.0', 'v19.0', 'v17.0'];
+    for (const version of versions) {
+      try {
+        const response = await fetch(
+          `https://graph.facebook.com/${version}/${userId}?fields=first_name,last_name,name,profile_pic&access_token=${pageAccessToken}`,
+        );
 
-    if (!response.ok) {
-      const error = await response.text();
-      this.logger.error(`Facebook Profile API ${response.status}: ${error}`);
-      throw new Error(`Facebook Profile API ${response.status}: ${error}`);
+        if (!response.ok) {
+          const error = await response.text();
+          this.logger.warn(`FB Profile API ${version} ${response.status}: ${error.substring(0, 200)}`);
+          continue; // try next version
+        }
+
+        const data = await response.json() as Record<string, unknown>;
+        this.logger.log(`FB profile ${version} response for ${userId}: ${JSON.stringify(data)}`);
+
+        const firstName = data.first_name as string | undefined;
+        const lastName = data.last_name as string | undefined;
+        const name = data.name as string | undefined;
+        const profilePic = data.profile_pic as string | undefined;
+
+        const displayName = [firstName, lastName].filter(Boolean).join(' ') || name || '';
+        if (displayName) {
+          return { name: displayName, profilePic };
+        }
+      } catch (err) {
+        this.logger.warn(`FB Profile API ${version} error: ${err}`);
+      }
     }
 
-    const data = await response.json() as Record<string, unknown>;
-    this.logger.log(`FB profile raw response for ${userId}: ${JSON.stringify(data)}`);
-
-    const firstName = data.first_name as string | undefined;
-    const lastName = data.last_name as string | undefined;
-    const name = data.name as string | undefined;
-    const profilePic = data.profile_pic as string | undefined;
-
-    const displayName = [firstName, lastName].filter(Boolean).join(' ') || name || '';
-    this.logger.log(`FB profile resolved: displayName="${displayName}", pic=${!!profilePic}`);
-
-    if (!displayName) {
-      throw new Error(`Facebook returned empty profile for ${userId}: ${JSON.stringify(data)}`);
+    // Fallback: try Conversations API to get participant name
+    try {
+      this.logger.log(`Trying Conversations API fallback for ${userId}`);
+      const convResponse = await fetch(
+        `https://graph.facebook.com/v21.0/me/conversations?user_id=${userId}&fields=participants&access_token=${pageAccessToken}`,
+      );
+      if (convResponse.ok) {
+        const convData = await convResponse.json() as Record<string, unknown>;
+        this.logger.log(`Conversations API response: ${JSON.stringify(convData).substring(0, 500)}`);
+        const dataArr = convData.data as Record<string, unknown>[] | undefined;
+        if (dataArr?.length) {
+          const participants = (dataArr[0].participants as Record<string, unknown>)?.data as Record<string, unknown>[] | undefined;
+          const user = participants?.find((p) => String(p.id) === userId);
+          if (user?.name) {
+            this.logger.log(`Got name from Conversations API: ${user.name}`);
+            return { name: String(user.name) };
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Conversations API fallback error: ${err}`);
     }
 
-    return { name: displayName, profilePic };
+    throw new Error(`Could not fetch profile for ${userId} from any API version`);
   }
 
   async sendMessage(
