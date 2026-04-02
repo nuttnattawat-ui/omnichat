@@ -838,6 +838,8 @@ export default function InboxPage() {
       const created = await api.addLabelToConversation(activeConversation.id, label.id);
       setConvLabels((prev) => [...prev, { id: (created as any).id, label }]);
     }
+    // Re-fetch conversations so sidebar labels update
+    fetchConversations();
   };
 
   const handleCannedSelect = (response: CannedResponse) => {
