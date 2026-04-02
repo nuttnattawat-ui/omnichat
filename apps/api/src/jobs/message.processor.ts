@@ -158,7 +158,8 @@ export class MessageProcessor {
     if (contactInbox.contact) {
       const contact = contactInbox.contact;
       const nameLower = contact.name?.toLowerCase() || '';
-      const needsUpdate = !contact.avatarUrl || !contact.name || nameLower === `${msg.channel} user` || nameLower.endsWith(' user') || nameLower === 'unknown';
+      const hasValidAvatar = contact.avatarUrl && !contact.avatarUrl.includes('graph.facebook.com');
+      const needsUpdate = !hasValidAvatar || !contact.name || nameLower === `${msg.channel} user` || nameLower.endsWith(' user') || nameLower === 'unknown';
       this.logger.log(`Contact ${contact.id}: name="${contact.name}", avatarUrl=${!!contact.avatarUrl}, needsUpdate=${needsUpdate}, senderPlatformId=${msg.sender.platformId}, storedSourceId=${contactInbox.sourceId}`);
 
       // Fix sourceId if it changed (shouldn't happen but just in case)
