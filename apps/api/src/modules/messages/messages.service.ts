@@ -43,7 +43,7 @@ export class MessagesService {
     return entry.token;
   }
 
-  async findByConversation(conversationId: number, page = 1, limit = 50) {
+  async findByConversation(conversationId: number, page = 1, limit = 200) {
     const messages = await this.prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'asc' },
@@ -54,6 +54,7 @@ export class MessagesService {
       },
     });
 
+    this.logger.log(`findByConversation(${conversationId}): found ${messages.length} messages, types: ${messages.map(m => m.messageType).join(',')}`);
     return messages.map((m) => ({
       ...m,
       senderName: m.senderUser?.name || (m.senderType === 'Contact' ? undefined : undefined),
