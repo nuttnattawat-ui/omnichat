@@ -688,14 +688,15 @@ export default function InboxPage() {
     };
   }, [fetchConversations, addMessage, updateConversation, playNotificationSound]);
 
+  const activeConvId = activeConversation?.id;
   useEffect(() => {
-    if (!activeConversation) return;
+    if (!activeConvId) return;
     const socket = connectSocket();
-    socket.emit('join_conversation', activeConversation.id);
+    socket.emit('join_conversation', activeConvId);
     return () => {
-      socket.emit('leave_conversation', activeConversation.id);
+      socket.emit('leave_conversation', activeConvId);
     };
-  }, [activeConversation]);
+  }, [activeConvId]);
 
   // Close dropdowns on click outside
   useEffect(() => {
