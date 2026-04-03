@@ -713,6 +713,7 @@ export default function InboxPage() {
   }, []);
 
   // Sync contact form + fetch labels + reset read receipt + auto refresh profile
+  // Only run when switching to a different conversation (by ID), not on metadata updates
   useEffect(() => {
     // Restore persisted read receipt from conversation customAttributes
     const savedReadAt = (activeConversation?.customAttributes as Record<string, unknown>)?.contactReadAt as string | undefined;
@@ -737,7 +738,7 @@ export default function InboxPage() {
     } else {
       setConvLabels([]);
     }
-  }, [activeConversation]);
+  }, [activeConvId]);
 
   // Auto-scroll to bottom — only when messages change, not on activeConversation metadata updates
   const prevConvRef = useRef<number | null>(null);
