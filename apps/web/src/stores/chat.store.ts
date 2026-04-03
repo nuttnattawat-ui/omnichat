@@ -89,13 +89,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
       contentType: options?.contentType,
       contentAttributes: options?.contentAttributes,
     });
+    // Add message to current list
     get().addMessage(message);
-    // Re-fetch all messages to ensure outgoing message persists in state
-    await get().fetchMessages(conversationId);
-    // Mark as read with incremented count (backend increments messagesCount)
+    // Update sidebar preview locally (no server round-trip)
+    set((state) => {
+      const conversations = state.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        return {
+          ...c,
+          lastActivityAt: new Date().toISOString(),
+          messagesCount: (c.messagesCount || 0) + 1,
+          messages: [{ content, contentType: options?.contentType || 'text', createdAt: new Date().toISOString() } as Message],
+        };
+      });
+      conversations.sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
+      return { conversations };
+    });
+    // Mark as read with incremented count
     const conv = get().conversations.find((c) => c.id === conversationId);
     if (conv) {
-      saveReadCount(conversationId, conv.messagesCount + 1);
+      saveReadCount(conversationId, conv.messagesCount);
     }
   },
 
