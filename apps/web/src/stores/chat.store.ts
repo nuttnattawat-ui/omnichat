@@ -90,6 +90,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       contentAttributes: options?.contentAttributes,
     });
     get().addMessage(message);
+    // Re-fetch all messages to ensure outgoing message persists in state
+    await get().fetchMessages(conversationId);
     // Mark as read with incremented count (backend increments messagesCount)
     const conv = get().conversations.find((c) => c.id === conversationId);
     if (conv) {
