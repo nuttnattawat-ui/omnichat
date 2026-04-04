@@ -752,14 +752,10 @@ export default function InboxPage() {
     // Only scroll when conversation changes or new messages arrive
     if (!isNewConv && !msgCountChanged) return;
 
-    const behavior = isNewConv ? 'instant' as ScrollBehavior : 'smooth';
-    messagesEndRef.current?.scrollIntoView({ behavior });
-
-    // Delayed scroll for images/stickers loading
-    const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior });
-    }, 150);
-    return () => clearTimeout(timer);
+    // Single scroll — use requestAnimationFrame to wait for DOM render
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    });
   }, [messages, activeConversation?.id]);
 
   const handleSend = async () => {

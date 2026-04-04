@@ -62,10 +62,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setActiveConversation: (conv) => {
-    set({ activeConversation: conv, messages: [] });
+    // Don't clear messages immediately — let fetchMessages replace them
+    // This prevents the flash of empty content when switching conversations
+    set({ activeConversation: conv });
     if (conv) {
       get().fetchMessages(conv.id);
       get().markAsRead(conv.id);
+    } else {
+      set({ messages: [] });
     }
   },
 
