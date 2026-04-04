@@ -20,7 +20,7 @@ export class ConversationsService {
       },
       include: {
         contact: { select: { id: true, name: true, avatarUrl: true } },
-        inbox: { select: { id: true, name: true, channelType: true } },
+        inbox: { select: { id: true, name: true, channelType: true, slaMinutes: true } },
         assignee: { select: { id: true, name: true } },
         messages: { orderBy: { createdAt: 'desc' }, take: 1 },
         labels: { include: { label: true } },

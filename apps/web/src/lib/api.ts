@@ -291,6 +291,36 @@ class ApiClient {
     });
   }
 
+  // Search
+  search(q: string) {
+    return this.request<{
+      contacts: Contact[];
+      messages: { id: number; conversationId: number; content: string; messageType: string; createdAt: string; conversation: { contact: { id: number; name: string } } }[];
+      conversations: Conversation[];
+    }>(`/search?q=${encodeURIComponent(q)}`);
+  }
+
+  // Export
+  exportConversations() {
+    return this.request<{ csv: string }>('/reports/export/conversations');
+  }
+
+  exportMessages() {
+    return this.request<{ csv: string }>('/reports/export/messages');
+  }
+
+  // CSAT
+  submitCsat(conversationId: number, data: { rating: number; feedback?: string }) {
+    return this.request<{ id: number }>(`/csat/${conversationId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getCsatStats() {
+    return this.request<{ avg: number; total: number; distribution: Record<string, number> }>('/csat/stats');
+  }
+
   // Invite Team Member
   inviteTeamMember(data: { name: string; email: string; role?: string }) {
     return this.request<TeamMember & { tempPassword: string }>('/settings/team/invite', {
@@ -308,9 +338,10 @@ export interface Conversation {
   status: string;
   lastActivityAt: string;
   messagesCount: number;
+  waitingSince?: string;
   customAttributes?: Record<string, unknown>;
   contact: { id: number; name: string; avatarUrl?: string };
-  inbox: { id: number; name: string; channelType: string };
+  inbox: { id: number; name: string; channelType: string; slaMinutes?: number };
   assignee?: { id: number; name: string };
   messages?: Message[];
   labels?: { id: number; label: { id: number; title: string; color?: string } }[];
@@ -349,6 +380,8 @@ export interface Inbox {
   aiEnabled: boolean;
   aiPrompt?: string;
   greeting?: string;
+  autoAssign: boolean;
+  slaMinutes?: number;
 }
 
 export interface UserProfile {

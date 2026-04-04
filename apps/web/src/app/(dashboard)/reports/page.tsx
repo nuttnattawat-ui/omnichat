@@ -63,6 +63,7 @@ export default function ReportsPage() {
   const [msgByDay, setMsgByDay] = useState<MessageDayData[]>([]);
   const [channels, setChannels] = useState<ChannelData[]>([]);
   const [agents, setAgents] = useState<AgentPerformance[]>([]);
+  const [csatStats, setCsatStats] = useState<{ avg: number; total: number; distribution: Record<string, number> } | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState(30);
 
@@ -74,13 +75,15 @@ export default function ReportsPage() {
       api.getMessagesByDay(period),
       api.getReportsByChannel(),
       api.getAgentPerformance(),
+      api.getCsatStats(),
     ])
-      .then(([ov, conv, msg, ch, ag]) => {
+      .then(([ov, conv, msg, ch, ag, csat]) => {
         setOverview(ov);
         setConvByDay(conv);
         setMsgByDay(msg);
         setChannels(ch);
         setAgents(ag);
+        setCsatStats(csat);
       })
       .finally(() => setLoading(false));
   }, [period]);
@@ -106,27 +109,60 @@ export default function ReportsPage() {
             <h2 className="text-xl font-bold text-gray-900">Reports</h2>
             <p className="text-sm text-gray-500">Analytics & performance overview</p>
           </div>
-          <div className="flex gap-1">
-            {[7, 14, 30].map((d) => (
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1">
+              {[7, 14, 30].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setPeriod(d)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    period === d ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1">
               <button
-                key={d}
-                onClick={() => setPeriod(d)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  period === d ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'
-                }`}
+                onClick={async () => {
+                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+                  const token = localStorage.getItem('token');
+                  const res = await fetch(`${apiUrl}/api/reports/export/conversations`, { headers: { Authorization: `Bearer ${token}` } });
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = 'conversations.csv'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
               >
-                {d}d
+                Export Conversations
               </button>
-            ))}
+              <button
+                onClick={async () => {
+                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+                  const token = localStorage.getItem('token');
+                  const res = await fetch(`${apiUrl}/api/reports/export/messages`, { headers: { Authorization: `Bearer ${token}` } });
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href = url; a.download = 'messages.csv'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Export Messages
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Overview Cards */}
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
           <StatCard label="Total Conversations" value={overview.totalConversations} color="text-gray-900" />
           <StatCard label="Open" value={overview.openConversations} color="text-orange-600" sub="Needs attention" />
           <StatCard label="Resolved" value={overview.resolvedConversations} color="text-green-600" sub={`${overview.resolutionRate}% rate`} />
           <StatCard label="Total Messages" value={overview.totalMessages} color="text-indigo-600" sub={`~${overview.avgMessages}/conv`} />
+          <StatCard label="CSAT Score" value={csatStats?.avg || '-'} color="text-yellow-600" sub={csatStats ? `${csatStats.total} ratings` : 'No ratings yet'} />
         </div>
 
         {/* Charts Row */}

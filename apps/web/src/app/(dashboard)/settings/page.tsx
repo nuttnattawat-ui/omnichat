@@ -10,6 +10,8 @@ type ChannelForm = {
   aiEnabled: boolean;
   aiPrompt: string;
   greeting: string;
+  autoAssign: boolean;
+  slaMinutes: string;
 };
 
 const emptyForm: ChannelForm = {
@@ -19,6 +21,8 @@ const emptyForm: ChannelForm = {
   aiEnabled: false,
   aiPrompt: '',
   greeting: '',
+  autoAssign: false,
+  slaMinutes: '',
 };
 
 const channelFields: Record<string, { key: string; label: string; placeholder: string }[]> = {
@@ -94,6 +98,8 @@ export default function SettingsPage() {
       aiEnabled: inbox.aiEnabled,
       aiPrompt: inbox.aiPrompt || '',
       greeting: inbox.greeting || '',
+      autoAssign: (inbox as any).autoAssign || false,
+      slaMinutes: (inbox as any).slaMinutes ? String((inbox as any).slaMinutes) : '',
     });
     setError('');
     setShowModal(true);
@@ -122,6 +128,8 @@ export default function SettingsPage() {
           aiEnabled: form.aiEnabled,
           aiPrompt: form.aiPrompt || null,
           greeting: form.greeting || null,
+          autoAssign: form.autoAssign,
+          slaMinutes: form.slaMinutes ? parseInt(form.slaMinutes) : null,
         });
       } else {
         await api.createInbox({
@@ -750,6 +758,42 @@ export default function SettingsPage() {
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Auto-Assign */}
+              <div className="rounded-lg border border-gray-200 p-4">
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={form.autoAssign}
+                    onChange={(e) => setForm({ ...form, autoAssign: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Auto-Assign (Round Robin)
+                  </span>
+                </label>
+                <p className="mt-1 ml-7 text-xs text-gray-400">
+                  Automatically assign new conversations to agents in rotation
+                </p>
+              </div>
+
+              {/* SLA Timer */}
+              <div className="rounded-lg border border-gray-200 p-4">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  SLA Response Time (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={form.slaMinutes}
+                  onChange={(e) => setForm({ ...form, slaMinutes: e.target.value })}
+                  placeholder="e.g. 15 (leave empty to disable)"
+                  min="1"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Conversations will show a warning if unanswered beyond this time
+                </p>
               </div>
             </div>
 

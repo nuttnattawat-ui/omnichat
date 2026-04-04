@@ -12,9 +12,11 @@ import {
 } from '@nestjs/common';
 import { InboxesService } from './inboxes.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @Controller('inboxes')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class InboxesController {
   constructor(private readonly inboxesService: InboxesService) {}
 
@@ -32,6 +34,7 @@ export class InboxesController {
   }
 
   @Post()
+  @Roles('admin')
   create(
     @Req() req: { user: { accountId: number } },
     @Body()
@@ -48,6 +51,7 @@ export class InboxesController {
   }
 
   @Patch(':id')
+  @Roles('admin')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: { user: { accountId: number } },
@@ -57,6 +61,7 @@ export class InboxesController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   delete(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: { user: { accountId: number } },

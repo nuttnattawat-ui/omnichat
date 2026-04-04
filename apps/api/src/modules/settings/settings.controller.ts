@@ -9,11 +9,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 
 @Controller('settings')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SettingsController {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -48,6 +50,7 @@ export class SettingsController {
 
   /** Get all team members */
   @Get('team')
+  @Roles('admin')
   async getTeam(@Req() req: { user: { accountId: number } }) {
     return this.prisma.user.findMany({
       where: { accountId: req.user.accountId },
@@ -64,6 +67,7 @@ export class SettingsController {
 
   /** Invite a new team member */
   @Post('team/invite')
+  @Roles('admin')
   async inviteTeamMember(
     @Req() req: { user: { accountId: number } },
     @Body() body: { name: string; email: string; role?: string },

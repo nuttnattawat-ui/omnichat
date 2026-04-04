@@ -216,14 +216,25 @@ export class MessageProcessor {
     });
 
     if (!conversation) {
+      // Auto-assign via round-robin if enabled
+      let assigneeId: number | undefined;
+      if (inbox.autoAssign) {
+        assigneeId = await this.getNextAssignee(inbox.accountId, inbox.id, inbox.lastAssignedUserId);
+      }
+
       conversation = await this.prisma.conversation.create({
         data: {
           accountId: inbox.accountId,
           inboxId: inbox.id,
           contactId: contactInbox.contactId,
           status: 'open',
+          assigneeId,
         },
       });
+
+      if (assigneeId) {
+        this.logger.log(`Auto-assigned conv=${conversation.id} to user=${assigneeId}`);
+      }
     }
 
     // 5. Resolve content for non-text messages
@@ -331,17 +342,83 @@ export class MessageProcessor {
       messagesCount: (conversation.messagesCount ?? 0) + 1,
     });
 
-    // 8. AI auto-reply if enabled
-    if (inbox.aiEnabled && msg.contentType === 'text') {
-      await this.aiService.handleAutoReply(
-        conversation.id,
-        inbox,
-        msg,
-      );
+    // 8. Auto-reply: AI chatbot or keyword-based greeting
+    const hasAssignee = !!conversation.assigneeId;
+    if (msg.contentType === 'text') {
+      if (inbox.aiEnabled && !hasAssignee) {
+        // AI auto-reply only when no agent is assigned
+        await this.aiService.handleAutoReply(
+          conversation.id,
+          inbox,
+          msg,
+        );
+      } else if (inbox.autoReply && !hasAssignee && conversation.messagesCount <= 1) {
+        // Keyword/greeting auto-reply for first message when AI is not enabled
+        await this.sendGreeting(conversation.id, inbox);
+      }
     }
 
     this.logger.log(
       `Message saved: conv=${conversation.id} msg=${savedMessage.id}`,
     );
+  }
+
+  /** Send greeting message when autoReply is enabled but AI is not */
+  private async sendGreeting(conversationId: number, inbox: { id: number; accountId: number; greeting: string | null }) {
+    const greeting = inbox.greeting || 'สวัสดีค่ะ ขอบคุณที่ติดต่อเข้ามา เจ้าหน้าที่จะตอบกลับโดยเร็วที่สุดค่ะ';
+
+    const savedReply = await this.prisma.message.create({
+      data: {
+        conversationId,
+        accountId: inbox.accountId,
+        inboxId: inbox.id,
+        messageType: 'outgoing',
+        content: greeting,
+        contentType: 'text',
+        senderType: 'Bot',
+      },
+    });
+
+    await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastActivityAt: new Date(),
+        messagesCount: { increment: 1 },
+      },
+    });
+
+    this.chatGateway.broadcastMessage(conversationId, {
+      ...savedReply,
+      senderName: 'Auto Reply',
+    });
+
+    this.logger.log(`Greeting sent for conv=${conversationId}`);
+  }
+
+  /** Round-robin: pick next active agent after the last assigned one */
+  private async getNextAssignee(accountId: number, inboxId: number, lastAssignedUserId: number | null): Promise<number | undefined> {
+    const agents = await this.prisma.user.findMany({
+      where: { accountId, isActive: true },
+      orderBy: { id: 'asc' },
+      select: { id: true },
+    });
+
+    if (agents.length === 0) return undefined;
+
+    let nextIndex = 0;
+    if (lastAssignedUserId) {
+      const lastIndex = agents.findIndex((a) => a.id === lastAssignedUserId);
+      nextIndex = (lastIndex + 1) % agents.length;
+    }
+
+    const assigneeId = agents[nextIndex].id;
+
+    // Update inbox to remember last assigned
+    await this.prisma.inbox.update({
+      where: { id: inboxId },
+      data: { lastAssignedUserId: assigneeId },
+    });
+
+    return assigneeId;
   }
 }

@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Req, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
@@ -188,5 +189,77 @@ export class ReportsController {
     );
 
     return result;
+  }
+
+  @Get('export/conversations')
+  async exportConversations(
+    @Req() req: { user: { accountId: number } },
+    @Res() res: Response,
+  ) {
+    const accountId = req.user.accountId;
+    const conversations = await this.prisma.conversation.findMany({
+      where: { accountId },
+      include: {
+        contact: { select: { name: true, email: true, phone: true } },
+        inbox: { select: { name: true, channelType: true } },
+        assignee: { select: { name: true } },
+      },
+      orderBy: { lastActivityAt: 'desc' },
+    });
+
+    const header = 'ID,Contact,Email,Phone,Channel,Inbox,Status,Assignee,Messages,Created,Last Activity\n';
+    const rows = conversations.map((c) =>
+      [
+        c.id,
+        `"${(c.contact.name || '').replace(/"/g, '""')}"`,
+        c.contact.email || '',
+        c.contact.phone || '',
+        c.inbox.channelType,
+        `"${c.inbox.name.replace(/"/g, '""')}"`,
+        c.status,
+        c.assignee?.name || '',
+        c.messagesCount,
+        c.createdAt.toISOString(),
+        c.lastActivityAt.toISOString(),
+      ].join(','),
+    ).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=conversations.csv');
+    res.send(header + rows);
+  }
+
+  @Get('export/messages')
+  async exportMessages(
+    @Req() req: { user: { accountId: number } },
+    @Res() res: Response,
+  ) {
+    const accountId = req.user.accountId;
+    const messages = await this.prisma.message.findMany({
+      where: { accountId, contentType: 'text' },
+      include: {
+        conversation: {
+          select: { contact: { select: { name: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+    });
+
+    const header = 'ID,Conversation ID,Contact,Type,Content,Created\n';
+    const rows = messages.map((m) =>
+      [
+        m.id,
+        m.conversationId,
+        `"${(m.conversation.contact.name || '').replace(/"/g, '""')}"`,
+        m.messageType,
+        `"${(m.content || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+        m.createdAt.toISOString(),
+      ].join(','),
+    ).join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=messages.csv');
+    res.send(header + rows);
   }
 }

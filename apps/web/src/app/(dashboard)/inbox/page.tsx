@@ -148,6 +148,19 @@ function ConversationItem({
             </span>
           )}
         </div>
+        {/* SLA Warning */}
+        {conv.status === 'open' && conv.waitingSince && conv.inbox.slaMinutes && (() => {
+          const elapsed = (Date.now() - new Date(conv.waitingSince).getTime()) / 60000;
+          const breached = elapsed >= conv.inbox.slaMinutes;
+          const warning = elapsed >= conv.inbox.slaMinutes * 0.75;
+          if (!warning) return null;
+          return (
+            <span className={`mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-medium ${breached ? 'text-red-600' : 'text-amber-600'}`}>
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"/></svg>
+              {breached ? 'SLA Breached' : 'SLA Warning'} ({Math.round(elapsed)}m)
+            </span>
+          );
+        })()}
         {/* Labels */}
         {conv.labels && conv.labels.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
@@ -571,6 +584,10 @@ export default function InboxPage() {
   const [soldCurrency, setSoldCurrency] = useState('THB');
   const [soldLoading, setSoldLoading] = useState(false);
   const [soldSuccess, setSoldSuccess] = useState(false);
+  const [showCsatModal, setShowCsatModal] = useState(false);
+  const [csatRating, setCsatRating] = useState(0);
+  const [csatFeedback, setCsatFeedback] = useState('');
+  const [csatConvId, setCsatConvId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1155,6 +1172,11 @@ export default function InboxPage() {
                   onClick={async () => {
                     await api.updateConversationStatus(activeConversation.id, 'resolved');
                     fetchConversations();
+                    // Show CSAT modal
+                    setCsatConvId(activeConversation.id);
+                    setCsatRating(0);
+                    setCsatFeedback('');
+                    setShowCsatModal(true);
                   }}
                   className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-100"
                 >
@@ -1651,6 +1673,65 @@ export default function InboxPage() {
                   </button>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSAT Modal */}
+      {showCsatModal && csatConvId && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowCsatModal(false)}
+        >
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">Customer Satisfaction</h3>
+            <p className="mb-4 text-sm text-gray-500">Rate this conversation (optional)</p>
+            <div className="mb-4 flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setCsatRating(star)}
+                  className="transition hover:scale-110"
+                >
+                  <svg
+                    className={`h-10 w-10 ${star <= csatRating ? 'text-yellow-400' : 'text-gray-200'}`}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={csatFeedback}
+              onChange={(e) => setCsatFeedback(e.target.value)}
+              placeholder="Additional feedback (optional)"
+              rows={2}
+              className="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowCsatModal(false)}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+              >
+                Skip
+              </button>
+              <button
+                onClick={async () => {
+                  if (csatRating > 0) {
+                    try {
+                      await api.submitCsat(csatConvId, { rating: csatRating, feedback: csatFeedback || undefined });
+                    } catch { /* ignore */ }
+                  }
+                  setShowCsatModal(false);
+                }}
+                disabled={csatRating === 0}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Submit
+              </button>
             </div>
           </div>
         </div>
