@@ -144,9 +144,8 @@ export class FacebookAdapter implements ChannelAdapter {
 
         const displayName = [firstName, lastName].filter(Boolean).join(' ') || name || '';
         if (displayName) {
-          // Use permanent Graph API URL instead of CDN URL (which expires)
-          const permanentPic = `https://graph.facebook.com/${userId}/picture?type=large&access_token=${pageAccessToken}`;
-          return { name: displayName, profilePic: permanentPic };
+          // Use CDN URL from profile_pic field — expires but gets refreshed on each message
+          return { name: displayName, profilePic: profilePic || undefined };
         }
       } catch (err) {
         this.logger.warn(`FB Profile API ${version} error: ${err}`);

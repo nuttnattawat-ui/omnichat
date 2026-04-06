@@ -158,7 +158,7 @@ export class MessageProcessor {
     if (contactInbox.contact) {
       const contact = contactInbox.contact;
       const nameLower = contact.name?.toLowerCase() || '';
-      // graph.facebook.com/*/picture URLs are permanent (won't expire), CDN URLs (scontent-*.fbcdn.net) expire
+      // CDN URLs (fbcdn.net / scontent-*) expire — refresh them
       const isExpiredCdnAvatar = contact.avatarUrl?.includes('fbcdn.net') || contact.avatarUrl?.includes('scontent');
       const hasValidAvatar = contact.avatarUrl && !isExpiredCdnAvatar;
       const needsUpdate = !hasValidAvatar || !contact.name || nameLower === `${msg.channel} user` || nameLower.endsWith(' user') || nameLower === 'unknown';
@@ -178,6 +178,8 @@ export class MessageProcessor {
           const channelConfig = inbox.channelConfig as Record<string, string>;
           // Always use the PSID from the current webhook (msg.sender.platformId), not the stored one
           const platformId = msg.sender.platformId;
+          let updatedName: string | undefined;
+          let updatedAvatar: string | null | undefined;
           if (msg.channel === 'line') {
             const token = channelConfig.channelAccessToken;
             const profile = await this.lineAdapter.getUserProfile(token, platformId);
@@ -187,6 +189,8 @@ export class MessageProcessor {
             });
             contactInbox.contact.name = profile.displayName;
             contactInbox.contact.avatarUrl = profile.pictureUrl ?? null;
+            updatedName = profile.displayName;
+            updatedAvatar = profile.pictureUrl ?? null;
             this.logger.log(`Updated LINE profile for contact ${contact.id}: ${profile.displayName}`);
           } else if (msg.channel === 'facebook' || msg.channel === 'instagram') {
             const token = channelConfig.pageAccessToken;
@@ -198,7 +202,24 @@ export class MessageProcessor {
             });
             contactInbox.contact.name = profile.name;
             contactInbox.contact.avatarUrl = profile.profilePic || null;
+            updatedName = profile.name;
+            updatedAvatar = profile.profilePic || null;
             this.logger.log(`Updated ${msg.channel} profile for contact ${contact.id}: ${profile.name}, pic=${!!profile.profilePic}`);
+          }
+
+          // Broadcast contact update to all conversations so header refreshes
+          if (updatedName) {
+            const convos = await this.prisma.conversation.findMany({
+              where: { contactId: contact.id, accountId: inbox.accountId },
+              select: { id: true },
+            });
+            for (const c of convos) {
+              this.chatGateway.broadcastConversationUpdate(inbox.accountId, {
+                id: c.id,
+                contactId: contact.id,
+                contact: { id: contact.id, name: updatedName, avatarUrl: updatedAvatar },
+              });
+            }
           }
         } catch (err) {
           this.logger.error(`FAILED to update profile for contact ${contact.id}: ${err}`);
