@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useChatStore } from '@/stores/chat.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { connectSocket } from '@/lib/socket';
 import { api, Message, Conversation, TeamMember, CannedResponse, Label } from '@/lib/api';
 
@@ -560,7 +561,7 @@ export default function InboxPage() {
   const [input, setInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('open');
   const [showInfo, setShowInfo] = useState(true);
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '' });
   const [savingContact, setSavingContact] = useState(false);
@@ -1163,14 +1164,19 @@ export default function InboxPage() {
                   </button>
                   {showAssignDropdown && (
                     <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                      <button
-                        onClick={() => handleAssign(null)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
-                      >
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-[10px]">—</span>
-                        Unassigned
-                      </button>
-                      {teamMembers.map((member) => (
+                      {useAuthStore.getState().isAdmin() && (
+                        <button
+                          onClick={() => handleAssign(null)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+                        >
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-[10px]">—</span>
+                          Unassigned
+                        </button>
+                      )}
+                      {(useAuthStore.getState().isAdmin()
+                        ? teamMembers
+                        : teamMembers.filter((m) => m.id === useAuthStore.getState().userId)
+                      ).map((member) => (
                         <button
                           key={member.id}
                           onClick={() => handleAssign(member.id)}
@@ -1214,23 +1220,39 @@ export default function InboxPage() {
                     {activeConversation.customAttributes?.conversionStatus === 'sold' ? 'Sold' : 'Mark Sold'}
                   </button>
                 )}
-                <button
-                  onClick={async () => {
-                    await api.updateConversationStatus(activeConversation.id, 'resolved');
-                    fetchConversations();
-                    // Show CSAT modal
-                    setCsatConvId(activeConversation.id);
-                    setCsatRating(0);
-                    setCsatFeedback('');
-                    setShowCsatModal(true);
-                  }}
-                  className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-100"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  Resolve
-                </button>
+                {activeConversation.status === 'resolved' ? (
+                  <button
+                    onClick={async () => {
+                      await api.updateConversationStatus(activeConversation.id, 'open');
+                      fetchConversations();
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reopen
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      await api.updateConversationStatus(activeConversation.id, 'resolved');
+                      fetchConversations();
+                      setActiveConversation(null);
+                      // Show CSAT modal
+                      setCsatConvId(activeConversation.id);
+                      setCsatRating(0);
+                      setCsatFeedback('');
+                      setShowCsatModal(true);
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-sm font-medium text-green-700 transition hover:bg-green-100"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Resolve
+                  </button>
+                )}
                 <button
                   onClick={() => setShowInfo(!showInfo)}
                   className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
@@ -1653,6 +1675,74 @@ export default function InboxPage() {
               )}
             </div>
           </div>
+
+          {/* Response Time Log */}
+          {(() => {
+            const slaMinutes = activeConversation.inbox.slaMinutes || 3;
+            const responseTimes: { agentName: string; responseMin: number; customerMsg: string; customerTime: string; agentTime: string; breached: boolean }[] = [];
+            for (let i = 0; i < messages.length; i++) {
+              const msg = messages[i];
+              if (msg.messageType !== 'incoming') continue;
+              // Find next outgoing message
+              for (let j = i + 1; j < messages.length; j++) {
+                const reply = messages[j];
+                if (reply.messageType === 'incoming') break; // another incoming before reply
+                if (reply.messageType === 'outgoing' || reply.senderType === 'Bot') {
+                  const diffMs = new Date(reply.createdAt).getTime() - new Date(msg.createdAt).getTime();
+                  const diffMin = Math.round(diffMs / 60000 * 10) / 10;
+                  responseTimes.push({
+                    agentName: reply.senderName || 'Agent',
+                    responseMin: diffMin,
+                    customerMsg: (msg.content || '').substring(0, 40),
+                    customerTime: formatTime(msg.createdAt),
+                    agentTime: formatTime(reply.createdAt),
+                    breached: diffMin > slaMinutes,
+                  });
+                  break;
+                }
+              }
+            }
+            if (responseTimes.length === 0) return null;
+            const avgMin = Math.round(responseTimes.reduce((s, r) => s + r.responseMin, 0) / responseTimes.length * 10) / 10;
+            const breachedCount = responseTimes.filter((r) => r.breached).length;
+            return (
+              <div className="space-y-2 border-t border-gray-100 p-4">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Response Times
+                </h4>
+                <div className="flex gap-3 text-xs">
+                  <div className="rounded-lg bg-gray-50 px-2.5 py-1.5">
+                    <span className="text-gray-500">Avg: </span>
+                    <span className={`font-semibold ${avgMin > slaMinutes ? 'text-red-600' : 'text-green-600'}`}>{avgMin}m</span>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 px-2.5 py-1.5">
+                    <span className="text-gray-500">SLA: </span>
+                    <span className="font-semibold text-gray-700">{slaMinutes}m</span>
+                  </div>
+                  {breachedCount > 0 && (
+                    <div className="rounded-lg bg-red-50 px-2.5 py-1.5">
+                      <span className="font-semibold text-red-600">{breachedCount} breached</span>
+                    </div>
+                  )}
+                </div>
+                <div className="max-h-[200px] space-y-1.5 overflow-y-auto">
+                  {responseTimes.map((rt, idx) => (
+                    <div key={idx} className={`rounded-lg p-2 text-xs ${rt.breached ? 'bg-red-50' : 'bg-gray-50'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-700">{rt.agentName}</span>
+                        <span className={`font-semibold ${rt.breached ? 'text-red-600' : 'text-green-600'}`}>
+                          {rt.responseMin}m {rt.breached ? '!' : ''}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-gray-400 truncate">
+                        {rt.customerTime} &rarr; {rt.agentTime} &middot; &quot;{rt.customerMsg}&quot;
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Private Notes */}
           <div className="space-y-3 border-t border-gray-100 p-4">

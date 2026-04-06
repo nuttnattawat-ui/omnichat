@@ -206,7 +206,7 @@ export class MessageProcessor {
       }
     }
 
-    // 4. Find or create conversation
+    // 4. Find or create conversation (reopen resolved ones)
     let conversation = await this.prisma.conversation.findFirst({
       where: {
         inboxId: inbox.id,
@@ -216,24 +216,43 @@ export class MessageProcessor {
     });
 
     if (!conversation) {
-      // Auto-assign via round-robin if enabled
-      let assigneeId: number | undefined;
-      if (inbox.autoAssign) {
-        assigneeId = await this.getNextAssignee(inbox.accountId, inbox.id, inbox.lastAssignedUserId);
-      }
-
-      conversation = await this.prisma.conversation.create({
-        data: {
-          accountId: inbox.accountId,
+      // Check for a resolved conversation to reopen
+      const resolved = await this.prisma.conversation.findFirst({
+        where: {
           inboxId: inbox.id,
           contactId: contactInbox.contactId,
-          status: 'open',
-          assigneeId,
+          status: 'resolved',
         },
+        orderBy: { lastActivityAt: 'desc' },
       });
 
-      if (assigneeId) {
-        this.logger.log(`Auto-assigned conv=${conversation.id} to user=${assigneeId}`);
+      if (resolved) {
+        // Reopen the most recent resolved conversation
+        conversation = await this.prisma.conversation.update({
+          where: { id: resolved.id },
+          data: { status: 'open', waitingSince: new Date() },
+        });
+        this.logger.log(`Reopened resolved conv=${conversation.id}`);
+      } else {
+        // Create new conversation
+        let assigneeId: number | undefined;
+        if (inbox.autoAssign) {
+          assigneeId = await this.getNextAssignee(inbox.accountId, inbox.id, inbox.lastAssignedUserId);
+        }
+
+        conversation = await this.prisma.conversation.create({
+          data: {
+            accountId: inbox.accountId,
+            inboxId: inbox.id,
+            contactId: contactInbox.contactId,
+            status: 'open',
+            assigneeId,
+          },
+        });
+
+        if (assigneeId) {
+          this.logger.log(`Auto-assigned conv=${conversation.id} to user=${assigneeId}`);
+        }
       }
     }
 
