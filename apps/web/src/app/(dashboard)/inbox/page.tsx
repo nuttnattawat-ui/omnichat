@@ -103,7 +103,7 @@ function ConversationItem({
       onClick={onClick}
       className={`group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
         isActive
-          ? 'bg-[#06C755]/10 border-l-[3px] border-[#06C755]'
+          ? 'bg-indigo-50 border-l-[3px] border-indigo-600'
           : 'hover:bg-gray-50 border-l-[3px] border-transparent'
       }`}
     >
@@ -144,7 +144,7 @@ function ConversationItem({
         <div className="flex items-center justify-between">
           <p className="truncate text-xs text-gray-500">{lastMsg || 'No messages yet'}</p>
           {unreadCount > 0 && !isActive && (
-            <span className="ml-2 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-[#06C755] px-1.5 text-[10px] font-bold text-white">
+            <span className="ml-2 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[10px] font-bold text-white">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -263,7 +263,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
   if (isPrivate) {
     return (
       <div className="flex items-end gap-2 justify-end">
-        <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>
+        <span className="mb-1 text-[10px] text-gray-500">{formatTime(msg.createdAt)}</span>
         <div className="relative max-w-[95%] rounded-2xl rounded-br-md bg-yellow-100 px-4 py-2.5 text-gray-800 ring-1 ring-yellow-200">
           <div className="mb-0.5 flex items-center gap-1 text-[10px] font-medium text-yellow-700">
             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -281,9 +281,9 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
   if (isSticker) {
     return (
       <div className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}>
-        {!isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+        {!isIncoming && <span className="mb-1 text-[10px] text-gray-500">{formatTime(msg.createdAt)}</span>}
         <StickerView content={msg.content} attrs={msg.contentAttributes} />
-        {isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+        {isIncoming && <span className="mb-1 text-[10px] text-gray-500">{formatTime(msg.createdAt)}</span>}
       </div>
     );
   }
@@ -293,7 +293,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
     const imgUrl = resolveMediaUrl(msg.content, msg.sourceId);
     return (
       <div className={`flex items-end gap-2 ${isIncoming ? 'justify-start' : 'justify-end'}`}>
-        {!isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+        {!isIncoming && <span className="mb-1 text-[10px] text-gray-500">{formatTime(msg.createdAt)}</span>}
         {imgUrl ? (
           <img
             src={imgUrl}
@@ -315,7 +315,7 @@ function ChatBubble({ msg, isLast, onImageClick }: { msg: Message; isLast: boole
             Image
           </div>
         )}
-        {isIncoming && <span className="mb-1 text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>}
+        {isIncoming && <span className="mb-1 text-[10px] text-gray-500">{formatTime(msg.createdAt)}</span>}
       </div>
     );
   }
@@ -417,7 +417,7 @@ function StickerPicker({ onSelect, onClose }: { onSelect: (packageId: string, st
             key={p.packageId}
             onClick={() => setActiveTab(i)}
             className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
-              activeTab === i ? 'bg-[#06C755] text-white' : 'text-gray-500 hover:bg-gray-100'
+              activeTab === i ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             {p.name}
@@ -522,7 +522,7 @@ function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void;
             key={cat.name}
             onClick={() => setActiveTab(i)}
             className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
-              activeTab === i ? 'bg-[#06C755] text-white' : 'text-gray-500 hover:bg-gray-100'
+              activeTab === i ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             {cat.name}
@@ -980,7 +980,7 @@ export default function InboxPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
-              className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-9 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#06C755]/30"
+              className="w-full rounded-full bg-gray-100 py-2 pl-10 pr-9 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
             />
             {search && (
               <button
@@ -1001,7 +1001,7 @@ export default function InboxPage() {
                 onClick={() => setFilter(f)}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   filter === f
-                    ? 'bg-[#06C755] text-white'
+                    ? 'bg-indigo-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
               >
@@ -1438,7 +1438,7 @@ export default function InboxPage() {
                 <button
                   onClick={handleSend}
                   disabled={!input.trim()}
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#06C755] text-white transition hover:bg-[#05b34c] disabled:opacity-40"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-700 disabled:opacity-40"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
@@ -1755,7 +1755,7 @@ export default function InboxPage() {
                   <p className="text-xs text-gray-700">{note.content}</p>
                   <div className="mt-1 flex items-center justify-between">
                     <span className="text-[10px] text-gray-400">{note.senderName || 'Agent'}</span>
-                    <span className="text-[10px] text-gray-400">{formatTime(note.createdAt)}</span>
+                    <span className="text-[10px] text-gray-500">{formatTime(note.createdAt)}</span>
                   </div>
                 </div>
               ))}

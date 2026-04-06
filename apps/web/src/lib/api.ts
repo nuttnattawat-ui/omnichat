@@ -226,6 +226,10 @@ class ApiClient {
     return this.request<AgentPerformance[]>('/reports/agent-performance');
   }
 
+  getAgentResponseTimes() {
+    return this.request<AgentResponseTime[]>('/reports/agent-response-times');
+  }
+
   // Canned Responses
   getCannedResponses() {
     return this.request<CannedResponse[]>('/canned-responses');
@@ -439,6 +443,20 @@ export interface AgentPerformance {
   assigned: number;
   resolved: number;
   messagesSent: number;
+}
+
+export interface AgentResponseTime {
+  id: number;
+  name: string;
+  role: string;
+  avatarUrl?: string;
+  totalConversations: number;
+  avgResponseMin: number;
+  medianResponseMin: number;
+  minResponseMin: number;
+  maxResponseMin: number;
+  breachedCount: number;
+  breachedRate: number;
 }
 
 export interface CannedResponse {

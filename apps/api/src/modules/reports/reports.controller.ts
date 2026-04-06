@@ -191,6 +191,84 @@ export class ReportsController {
     return result;
   }
 
+  @Get('agent-response-times')
+  async getAgentResponseTimes(@Req() req: { user: { accountId: number } }) {
+    const accountId = req.user.accountId;
+
+    const agents = await this.prisma.user.findMany({
+      where: { accountId, isActive: true },
+      select: { id: true, name: true, role: true, avatarUrl: true },
+    });
+
+    // Get all conversations that have a first reply
+    const conversations = await this.prisma.conversation.findMany({
+      where: {
+        accountId,
+        firstReplyAt: { not: null },
+      },
+      select: {
+        id: true,
+        assigneeId: true,
+        createdAt: true,
+        firstReplyAt: true,
+        inbox: { select: { slaMinutes: true } },
+      },
+    });
+
+    // Calculate per-agent response time stats
+    const result = agents.map((agent) => {
+      const agentConvs = conversations.filter((c) => c.assigneeId === agent.id);
+      const times = agentConvs
+        .map((c) => {
+          const diffMs = new Date(c.firstReplyAt!).getTime() - new Date(c.createdAt).getTime();
+          return {
+            minutes: Math.round(diffMs / 60000 * 10) / 10,
+            sla: c.inbox.slaMinutes || 3,
+          };
+        })
+        .filter((t) => t.minutes >= 0);
+
+      if (times.length === 0) {
+        return {
+          id: agent.id,
+          name: agent.name,
+          role: agent.role,
+          avatarUrl: agent.avatarUrl,
+          totalConversations: 0,
+          avgResponseMin: 0,
+          medianResponseMin: 0,
+          minResponseMin: 0,
+          maxResponseMin: 0,
+          breachedCount: 0,
+          breachedRate: 0,
+        };
+      }
+
+      const sorted = times.map((t) => t.minutes).sort((a, b) => a - b);
+      const avg = Math.round(sorted.reduce((s, v) => s + v, 0) / sorted.length * 10) / 10;
+      const median = sorted.length % 2 === 0
+        ? Math.round((sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 * 10) / 10
+        : sorted[Math.floor(sorted.length / 2)];
+      const breached = times.filter((t) => t.minutes > t.sla).length;
+
+      return {
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        avatarUrl: agent.avatarUrl,
+        totalConversations: times.length,
+        avgResponseMin: avg,
+        medianResponseMin: median,
+        minResponseMin: sorted[0],
+        maxResponseMin: sorted[sorted.length - 1],
+        breachedCount: breached,
+        breachedRate: Math.round((breached / times.length) * 100),
+      };
+    });
+
+    return result;
+  }
+
   @Get('export/conversations')
   async exportConversations(
     @Req() req: { user: { accountId: number } },
