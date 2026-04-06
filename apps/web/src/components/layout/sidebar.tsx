@@ -9,7 +9,6 @@ import { useAuthStore } from '@/stores/auth.store';
 const allNavItems = [
   { href: '/inbox', label: 'Inbox', icon: 'inbox' },
   { href: '/contacts', label: 'Contacts', icon: 'users' },
-  { href: '/search', label: 'Search', icon: 'search' },
   { href: '/reports', label: 'Reports', icon: 'reports' },
   { href: '/settings', label: 'Settings', icon: 'settings', adminOnly: true },
 ];

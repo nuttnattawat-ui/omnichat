@@ -588,6 +588,8 @@ export default function InboxPage() {
   const [csatRating, setCsatRating] = useState(0);
   const [csatFeedback, setCsatFeedback] = useState('');
   const [csatConvId, setCsatConvId] = useState<number | null>(null);
+  const [searchResults, setSearchResults] = useState<{ id: number; conversationId: number; content: string; conversation: { contact: { id: number; name: string } } }[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -915,6 +917,28 @@ export default function InboxPage() {
     }
   };
 
+  // Search messages via API when query is 3+ chars
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (search.trim().length < 3) {
+      setSearchResults(null);
+      return;
+    }
+    setSearchLoading(true);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const data = await api.search(search.trim());
+        setSearchResults(data.messages);
+      } catch {
+        setSearchResults(null);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [search]);
+
   const filteredConversations = conversations
     .filter((c) => {
       if (filter === 'open') return c.status === 'open';
@@ -997,12 +1021,34 @@ export default function InboxPage() {
               onClick={() => setActiveConversation(conv)}
             />
           ))}
-          {filteredConversations.length === 0 && (
+          {filteredConversations.length === 0 && !searchResults?.length && (
             <div className="flex flex-col items-center justify-center p-8 text-center">
               <svg className="mb-3 h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
               <p className="text-sm text-gray-400">No conversations</p>
+            </div>
+          )}
+
+          {/* Message search results */}
+          {search.trim().length >= 3 && (
+            <div className="border-t border-gray-200">
+              <div className="px-4 py-2 text-xs font-semibold text-gray-500 bg-gray-50">
+                {searchLoading ? 'Searching messages...' : searchResults?.length ? `Messages (${searchResults.length})` : 'No message matches'}
+              </div>
+              {searchResults?.map((msg) => (
+                <button
+                  key={msg.id}
+                  onClick={() => {
+                    const conv = conversations.find((c) => c.id === msg.conversationId);
+                    if (conv) setActiveConversation(conv);
+                  }}
+                  className="w-full border-b border-gray-50 px-4 py-2.5 text-left hover:bg-gray-50"
+                >
+                  <p className="text-xs font-medium text-gray-500">{msg.conversation.contact.name}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-gray-700">{msg.content}</p>
+                </button>
+              ))}
             </div>
           )}
         </div>
