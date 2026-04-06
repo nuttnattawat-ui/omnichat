@@ -55,6 +55,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const conversations = await api.getConversations(filters);
       conversations.sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
+      // Initialize read counts for conversations not yet tracked (new user/browser)
+      const readCounts = getReadCounts();
+      for (const c of conversations) {
+        if (readCounts[c.id] == null) {
+          saveReadCount(c.id, c.messagesCount);
+        }
+      }
       set({ conversations });
     } finally {
       set({ loading: false });
