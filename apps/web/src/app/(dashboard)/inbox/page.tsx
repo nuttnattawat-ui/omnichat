@@ -115,12 +115,16 @@ function ConversationItem({
             alt={conv.contact.name}
             className="h-12 w-12 rounded-full object-cover"
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              const el = e.currentTarget;
+              el.style.display = 'none';
+              el.nextElementSibling?.classList.remove('hidden');
+            }}
           />
-        ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
-            {getInitials(conv.contact.name || '?')}
-          </div>
-        )}
+        ) : null}
+        <div className={`${conv.contact.avatarUrl ? 'hidden' : ''} flex h-12 w-12 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600`}>
+          {getInitials(conv.contact.name || '?')}
+        </div>
         {/* Channel indicator */}
         <span
           className={`absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold text-white ring-2 ring-white ${
@@ -1068,12 +1072,16 @@ export default function InboxPage() {
                     alt=""
                     className="h-10 w-10 rounded-full object-cover"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const el = e.currentTarget;
+                      el.style.display = 'none';
+                      el.nextElementSibling?.classList.remove('hidden');
+                    }}
                   />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
-                    {getInitials(activeConversation.contact.name || '?')}
-                  </div>
-                )}
+                ) : null}
+                <div className={`${activeConversation.contact.avatarUrl ? 'hidden' : ''} flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600`}>
+                  {getInitials(activeConversation.contact.name || '?')}
+                </div>
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">
                     {activeConversation.contact.name}
@@ -1571,12 +1579,16 @@ export default function InboxPage() {
                 alt=""
                 className="mb-3 h-16 w-16 rounded-full object-cover"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = 'none';
+                  el.nextElementSibling?.classList.remove('hidden');
+                }}
               />
-            ) : (
-              <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-lg font-semibold text-gray-600">
-                {getInitials(activeConversation.contact.name || '?')}
-              </div>
-            )}
+            ) : null}
+            <div className={`${activeConversation.contact.avatarUrl ? 'hidden' : ''} mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-lg font-semibold text-gray-600`}>
+              {getInitials(activeConversation.contact.name || '?')}
+            </div>
             <h3 className="text-sm font-bold text-gray-900">
               {activeConversation.contact.name}
             </h3>

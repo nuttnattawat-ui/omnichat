@@ -76,7 +76,8 @@ export class ContactsController {
     for (const contact of contacts) {
       const nameLower = (contact.name || '').toLowerCase();
       const isGeneric = !contact.name || nameLower.endsWith(' user') || nameLower === 'unknown';
-      if (!isGeneric) {
+      const hasStaleAvatar = contact.avatarUrl?.includes('fbcdn.net') || contact.avatarUrl?.includes('scontent') || contact.avatarUrl?.includes('graph.facebook.com');
+      if (!isGeneric && !hasStaleAvatar) {
         results.push({ id: contact.id, name: contact.name || '', status: 'ok' });
         continue;
       }
